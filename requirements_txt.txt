@@ -1,0 +1,28 @@
+# Dependencias del Sistema de Análisis Jurisprudencial SCJN
+
+# API de Gemini
+google-genai>=0.15.0
+
+# Validación de datos
+pydantic>=2.0.0
+
+# Procesamiento de documentos
+python-docx>=0.8.11
+chardet>=5.0.0
+
+# Interfaz y progreso
+tqdm>=4.65.0
+argparse
+
+# Utilidades estándar
+pathlib
+datetime
+json
+hashlib
+signal
+time
+typing
+
+# Para interfaz web (opcional - instalar cuando se implemente)
+# flask>=2.3.0
+# flask-cors>=4.0.0

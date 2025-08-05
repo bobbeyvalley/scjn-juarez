@@ -1,0 +1,234 @@
+# Sistema de Análisis Jurisprudencial SCJN
+
+## Instalación
+
+1. **Clonar el repositorio:**
+```bash
+git clone <repository-url>
+cd scjn_analyzer
+```
+
+2. **Instalar dependencias:**
+```bash
+pip install -r requirements.txt
+```
+
+3. **Configurar API Key de Gemini:**
+```bash
+export GEMINI_API_KEY="tu_api_key_aqui"
+```
+
+## Uso - Versión Consola
+
+### Comando básico
+```bash
+python main.py --expediente "C:\ruta\a\carpeta\expediente"
+```
+
+### Opciones avanzadas
+```bash
+# Con timeout personalizado (180 segundos)
+python main.py --expediente "C:\expediente_123" --timeout 180
+
+# Con más reintentos (3 intentos)
+python main.py --expediente "C:\expediente_123" --reintentos 3
+
+# Combinado
+python main.py --expediente "C:\expediente_123" --timeout 180 --reintentos 3
+```
+
+## Estructura de Archivos
+
+### Antes del procesamiento
+```
+expediente_123/
+├── documento1.pdf
+├── documento2.docx
+├── documento3.txt
+└── imagen_escaneada.jpg
+```
+
+### Después del procesamiento
+```
+expediente_123/
+├── documento1.pdf
+├── documento2.docx
+├── documento3.txt
+├── imagen_escaneada.jpg
+├── jsons/
+│   ├── documento1_mapeado.json
+│   ├── documento2_mapeado.json
+│   ├── documento3_mapeado.json
+│   ├── imagen_escaneada_mapeado.json
+│   └── bitacora_proceso.json
+└── reporte/
+    └── reporte_ejecutivo_expediente_123_20241203_143022.md
+```
+
+## Formatos Soportados
+
+### Documentos de texto
+- **PDF**: `.pdf` - Procesado con OCR automático
+- **Word**: `.docx`, `.doc` - Extracción de texto y tablas
+- **Texto plano**: `.txt` - Con detección automática de encoding
+
+### Imágenes (OCR)
+- **JPEG**: `.jpg`, `.jpeg`
+- **PNG**: `.png`
+- **TIFF**: `.tiff`, `.tif`
+
+## Características del Sistema
+
+### ✅ Resume Automático
+- Si el proceso se interrumpe, puedes ejecutar el mismo comando
+- Solo procesará los documentos que faltan
+- Mantiene historial completo en bitácora
+
+### ✅ Tolerancia a Errores
+- Continúa procesando aunque algunos documentos fallen
+- Reintentos automáticos configurables
+- Bitácora detallada de éxitos y errores
+
+### ✅ Reporte Condicionado
+- El reporte ejecutivo **solo se genera cuando TODOS los documentos del expediente están procesados**
+- Si faltan documentos, te indica cuáles y puedes ejecutar de nuevo
+
+### ✅ Progress Visual
+```
+Procesando documento_largo.pdf...    
+📄 Documentos: 3/8 [██████████████████████████----] 75% | exitosos: 3, fallos: 0, tokens: 15,847
+```
+
+## Ejemplos de Uso
+
+### Caso 1: Expediente nuevo
+```bash
+$ python main.py --expediente "C:\expedientes\ADR_6035_2023"
+
+🚀 Analizando expediente: ADR_6035_2023
+📁 Ruta: C:\expedientes\ADR_6035_2023
+================================================================================
+📋 Expediente nuevo - 5 documentos encontrados
+
+🔄 Procesando 5 documentos pendientes...
+Procesando ADMISION.pdf...              [1/5] ✅ Completado. Tokens: 2,341, Tiempo: 45.23s
+Procesando DEMANDA.docx...               [2/5] ✅ Completado. Tokens: 3,892, Tiempo: 67.12s
+Procesando SENTENCIA.pdf...              [3/5] ✅ Completado. Tokens: 8,234, Tiempo: 123.45s
+Procesando RECURSO.pdf...                [4/5] ✅ Completado. Tokens: 4,567, Tiempo: 78.90s
+Procesando ENGROSE.pdf...                [5/5] ✅ Completado. Tokens: 6,123, Tiempo: 89.34s
+
+📊 Generando reporte ejecutivo para expediente ADR_6035_2023...
+  ✅ Reporte generado: reporte_ejecutivo_ADR_6035_2023_20241203_143022.md
+  📊 Tokens utilizados: 2,456
+  📄 Documentos analizados: 5
+
+================================================================================
+🎉 EXPEDIENTE COMPLETADO
+================================================================================
+📄 Documentos procesados exitosamente: 5
+❌ Documentos con errores: 0
+🔤 Total de tokens utilizados: 27,613
+⏱️ Tiempo total de procesamiento: 406.50 segundos
+💰 Costo estimado (aprox): $0.0276 USD
+📊 Reporte ejecutivo generado
+================================================================================
+```
+
+### Caso 2: Resume de expediente interrumpido
+```bash
+$ python main.py --expediente "C:\expedientes\ADR_6035_2023"
+
+🚀 Analizando expediente: ADR_6035_2023
+📁 Ruta: C:\expedientes\ADR_6035_2023
+================================================================================
+📋 Resumiendo expediente - 3 procesados, 2 pendientes
+
+🔄 Procesando 2 documentos pendientes...
+Procesando RECURSO.pdf...                [1/2] ✅ Completado. Tokens: 4,567, Tiempo: 78.90s
+Procesando ENGROSE.pdf...                [2/2] ✅ Completado. Tokens: 6,123, Tiempo: 89.34s
+
+📊 Generando reporte ejecutivo para expediente ADR_6035_2023...
+...
+```
+
+### Caso 3: Expediente con errores
+```bash
+🔄 Procesando 3 documentos pendientes...
+Procesando documento_corrupto.pdf...     [1/3] 🔄 Intento 1 falló: Invalid PDF... Reintentando en 5s
+                                               🔄 Intento 2 falló: Invalid PDF... Reintentando en 5s
+                                               ❌ Error final después de 3 intentos
+Procesando documento_ok.docx...           [2/3] ✅ Completado. Tokens: 2,341, Tiempo: 45.23s
+Procesando otro_ok.pdf...                [3/3] ✅ Completado. Tokens: 3,456, Tiempo: 67.89s
+
+⏳ Expediente incompleto. Documentos faltantes: 1
+   📄 documento_corrupto.pdf
+💡 Ejecuta el comando nuevamente para procesar los documentos faltantes
+```
+
+## Variables de Entorno
+
+```bash
+# Requerida
+export GEMINI_API_KEY="tu_api_key_de_gemini"
+
+# Opcionales (con valores por defecto)
+export TIMEOUT_BASE_SEGUNDOS=120
+export MAX_REINTENTOS=2
+export PAUSA_ENTRE_DOCUMENTOS=2.0
+```
+
+## Troubleshooting
+
+### Error: API Key no configurada
+```bash
+❌ Error: GEMINI_API_KEY no está configurada en las variables de entorno
+```
+**Solución:** Configura la variable de entorno con tu API key de Gemini.
+
+### Error: Timeout en documentos grandes
+```bash
+🔄 Intento 1 falló: Request timeout... Reintentando en 5s
+```
+**Solución:** Usa un timeout mayor:
+```bash
+python main.py --expediente "C:\expediente" --timeout 300
+```
+
+### Error: Carpeta no existe
+```bash
+❌ Error: La carpeta C:\expediente_inexistente no existe
+```
+**Solución:** Verifica la ruta del expediente.
+
+## Estructura de la Bitácora
+
+```json
+{
+  "resumen_expediente": {
+    "numero_expediente": "ADR_6035_2023",
+    "total_documentos_disponibles": 5,
+    "total_documentos_procesados": 5,
+    "total_documentos_fallidos": 0,
+    "tokens_totales": 27613,
+    "tiempo_total_procesamiento": 406.5,
+    "expediente_completo": true
+  },
+  "bitacora_detallada": [
+    {
+      "timestamp": "2024-12-03T14:25:15",
+      "expediente": "ADR_6035_2023",
+      "documento": "ADMISION.pdf",
+      "status": "success",
+      "mensaje": "Procesado exitosamente en intento 1. Tokens: 2341",
+      "metadata": {
+        "nombre_archivo": "ADMISION.pdf",
+        "formato": ".pdf",
+        "tamano_bytes": 156789,
+        "tokens_utilizados": 2341,
+        "tiempo_procesamiento": 45.23,
+        "hash_archivo": "abc123..."
+      }
+    }
+  ]
+}
+```
