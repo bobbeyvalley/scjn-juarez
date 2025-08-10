@@ -117,10 +117,15 @@ class SCJNAnalyzer:
     def listar_documentos_soportados(self, carpeta: Path) -> List[Path]:
         """Lista todos los documentos soportados en la carpeta"""
         documentos = []
+        documentos_vistos = set()  # Para evitar duplicados
+    
         for extension in self.processors.keys():
-            documentos.extend(carpeta.glob(f"*{extension}"))
-            documentos.extend(carpeta.glob(f"*{extension.upper()}"))
-        return sorted(documentos)  # Orden alfabético
+            for archivo in carpeta.glob(f"*{extension}"):
+                if archivo.name not in documentos_vistos:
+                    documentos.append(archivo)
+                    documentos_vistos.add(archivo.name)
+
+        return sorted(documentos)
 
     def analizar_estado_expediente(self, carpeta_expediente: Path, expediente: str) -> Tuple[List[Path], str]:
         """Analiza qué documentos faltan por procesar"""
@@ -195,6 +200,70 @@ class SCJNAnalyzer:
                     tipo_contenido=tipo_contenido
                 )
                 
+                print(f"\n🔍 DEBUG - JSON recibido de Gemini:")
+                print(json.dumps(resultado_json, indent=2, ensure_ascii=False))
+                
+                # TRANSFORMAR ESTRUCTURA ANIDADA A PLANA
+                def flatten_gemini_response(json_data):
+                    """Convierte la estructura anidada de Gemini a estructura plana para Pydantic"""
+                    flattened = {}
+                    
+                    # Copiar campos de nivel superior
+                    flattened["documento"] = json_data.get("documento", "")
+                    
+                    # Extraer de identificacion_basica
+                    if "identificacion_basica" in json_data:
+                        ib = json_data["identificacion_basica"]
+                        flattened["tipo"] = ib.get("tipo_documento", "")
+                        flattened["fecha_expedicion"] = ib.get("fecha_expedicion", "")
+                        flattened["organo_emisor"] = ib.get("organo_emisor", "")
+                        expediente_raw = ib.get("expediente_citados", "")
+                        if isinstance(expediente_raw, list):
+                            flattened["expediente"] = ", ".join(expediente_raw)  # Convertir lista a string
+                        else:
+                            flattened["expediente"] = str(expediente_raw)
+                        flattened["folios"] = ib.get("numero_fojas", None)
+                    
+                    # Extraer de partes_relevantes
+                    if "partes_relevantes" in json_data:
+                        pr = json_data["partes_relevantes"]
+                        flattened["partes"] = {
+                            "quejoso": pr.get("quejoso_promovente_recurrente", ""),
+                            "autoridad_responsable": pr.get("autoridad_responsable", ""),
+                            "terceros_interesados": pr.get("terceros_interesados", None)
+                        }
+                    
+                    # Extraer planteamiento
+                    flattened["planteamiento"] = json_data.get("planteamiento_o_acto_reclamado", "")
+                    
+                    # Copiar puntos_analisis (ya está bien)
+                    flattened["puntos_analisis"] = json_data.get("puntos_analisis", [])
+                    
+                    # Extraer normas (puede tener nombres diferentes)
+                    flattened["normas_invocadas"] = json_data.get("normas_invocadas", 
+                        json_data.get("normas_o_precedentes_invocados", []))
+                    
+                    # Extraer pretensiones (puede tener nombres diferentes)
+                    flattened["pretensiones"] = json_data.get("pretensiones", 
+                        json_data.get("pretensiones_o_resolucion", []))
+                    
+                    # Extraer de metadatos_de_ubicacion
+                    if "metadatos_de_ubicacion" in json_data:
+                        mu = json_data["metadatos_de_ubicacion"]
+                        flattened["paginas_pdf"] = mu.get("paginas_pdf", [1, 1])
+                    else:
+                        flattened["paginas_pdf"] = json_data.get("paginas_pdf", [1, 1])
+                    
+                    return flattened
+
+                # TRANSFORMAR EL JSON
+                resultado_json = flatten_gemini_response(resultado_json)
+
+                print(f"\n🔍 DEBUG - JSON transformado para Pydantic:")
+                print(json.dumps(resultado_json, indent=2, ensure_ascii=False))
+                print("-" * 50)
+
+
                 # Validar estructura
                 documento_validado = SCJN_Documento(**resultado_json)
                 
@@ -228,7 +297,7 @@ class SCJNAnalyzer:
                 
             except Exception as e:
                 if intento < self.config.max_reintentos:
-                    print(f"    🔄 Intento {intento + 1} falló: {str(e)[:50]}... Reintentando en {self.config.pausa_entre_reintentos_segundos}s")
+                    print(f"    🔄 Intento {intento + 1} falló: {str(e)} Reintentando en {self.config.pausa_entre_reintentos_segundos}s")
                     time.sleep(self.config.pausa_entre_reintentos_segundos)
                     continue
                 else:
@@ -383,7 +452,7 @@ class SCJNAnalyzer:
         # Preparar datos de la bitácora
         bitacora_dict = []
         for entry in self.bitacora:
-            entry_dict = entry.dict()
+            entry_dict = entry.model_dump()
             # Convertir datetime a string para serialización
             entry_dict['timestamp'] = entry.timestamp.isoformat()
             entry_dict['metadata']['fecha_procesamiento'] = entry.metadata.fecha_procesamiento.isoformat()
@@ -428,7 +497,7 @@ class SCJNAnalyzer:
         print(f"❌ Documentos con errores: {errores}")
         print(f"🔤 Total de tokens utilizados: {self.tokens_totales:,}")
         print(f"⏱️ Tiempo total de procesamiento: {self.tiempo_total:.2f} segundos")
-        print(f"💰 Costo estimado (aprox): ${self.tokens_totales * 0.000001:.4f} USD")
+        # print(f"💰 Costo estimado (aprox): ${self.tokens_totales * 0.000001:.4f} USD")
         
         if expediente_completo:
             print("📊 Reporte ejecutivo generado")

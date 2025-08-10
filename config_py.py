@@ -109,7 +109,35 @@ Array con cada petición o determinación final.
 Metadatos de ubicación
 "paginas_pdf": [inicio, fin] del documento en el PDF original.
 Profundidad
-Conserva jerarquía: "conceptos_violacion" o "acuerdos" como sub-arrays cuando aplique."""
+Conserva jerarquía: "conceptos_violacion" o "acuerdos" como sub-arrays cuando aplique.
+
+Ejemplo de salida esperada (solo ilustrativo):
+{
+  "documento": "ADMISIÓN ADR 1241 2024.pdf",
+  "tipo": "Acuerdo de Admisión",
+  "fecha_expedicion": "2024-02-12",
+  "organo_emisor": "Presidencia de la SCJN",
+  "expediente": "1241/2024",
+  "folios": 11,
+  "paginas_pdf": [1, 11],
+  "partes": {
+    "quejoso": "Corporativo Ferloguer, S.A. de C.V.",
+    "autoridad_responsable": "6ª Sala Civil TSJCDMX"
+  },
+  "planteamiento": "Consecuencias civiles de la falsedad en la promesa de decir verdad.",
+  "puntos_analisis": [
+    {
+      "titulo": "Interpretación art. 130",
+      "resumen": "Solicita aclarar efectos civiles de la promesa incumplida.",
+      "pagina": 3,
+      "citas": [
+        "¿puede acaso hacer y tres manifestaciones diversas… y pretender que todas sean válidas?"
+        ]
+    }
+  ],
+  "normas_invocadas": ["Art. 130 CPEUM", "Art. 107 fracc. IX CPEUM"],
+  "pretensiones": ["Admitir el recurso de revisión"]
+}"""
 
     REPORTE_PROMPT = """**PROMPT PARA GENERACIÓN DE REPORTE EJECUTIVO DE CASO LEGAL**
 
