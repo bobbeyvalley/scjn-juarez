@@ -1,0 +1,40 @@
+[
+  {
+    "instruccion_general": "Actúa como un experto analista legal especializado en el sistema judicial mexicano. Tu tarea es extraer información estructurada de documentos judiciales para reconstruir la cronología de un caso ante la Suprema Corte de Justicia de la Nación. Analiza el documento proporcionado y completa los siguientes campos con la máxima precisión."
+  },
+  {
+    "documento": "Nombre exacto del archivo (ej. 'ADMISIÓN ADR 1241 2024.pdf').",
+    "identificacion_basica": {
+      "tipo_documento": "Tipo de actuación (ej. 'Acuerdo de Admisión', 'Sentencia de Amparo Directo', 'Demanda de Amparo').",
+      "etapa_procesal_resuelta": "Clasifica la etapa del juicio que este documento resuelve o inicia. ¡IMPORTANTE! El valor DEBE ser uno de los siguientes: ['Juicio de Origen', 'Recurso de Apelación', 'Demanda de Amparo', 'Sentencia de Amparo Directo', 'Recurso de Revisión', 'Acuerdo de Admisión de Revisión', 'Avocamiento', 'Otra'].",
+      "fecha_resolucion": "Fecha en que se dictó la sentencia o acuerdo (formato AAAA-MM-DD).",
+      "organo_emisor": "Tribunal, Sala o entidad que emite el documento.",
+      "expedientes_principales": "Array de los números de expediente asignados a ESTA actuación (ej. ['D.C. 153/2020', 'Toca 498/2019']).",
+      "folios": "Número total de fojas o páginas del documento físico."
+    },
+    "partes": {
+      "quejoso_recurrente": "Nombre de la persona o entidad quejosa o recurrente.",
+      "autoridad_responsable": "Nombre de la autoridad cuya resolución se impugna en ESTA etapa.",
+      "terceros_interesados": "Array con los nombres de los terceros interesados, si se mencionan."
+    },
+    "planteamiento_acto_reclamado": "Frase breve (≤ 280 caracteres) que resuma la controversia principal de ESTE documento o la decisión que se impugna.",
+    "puntos_analisis": [
+      {
+        "titulo": "Máximo 10 palabras.",
+        "resumen": "Máximo 120 caracteres.",
+        "pagina": "Página(s) exacta(s) dentro del PDF.",
+        "citas": [
+          "1-3 fragmentos textuales literalmente copiados (≤ 500 caracteres c/u) que respalden el punto."
+        ]
+      }
+    ],
+    "decision_o_resolutivos": {
+      "sentido_del_fallo": "Describe el resultado principal (ej. 'Se niega el amparo', 'Se concede el amparo', 'Se admite el recurso', 'Se confirma la sentencia', 'Se revoca la sentencia').",
+      "puntos_resolutivos": "Array con la transcripción literal de los puntos resolutivos ('PRIMERO.', 'SEGUNDO.', etc.). Si es un acuerdo, transcribe las determinaciones principales."
+    },
+    "normas_invocadas": "Lista de artículos constitucionales, leyes o tesis jurisprudenciales más relevantes mencionados.",
+    "metadatos_ubicacion": {
+      "paginas_pdf": "[inicio, fin] del documento en el PDF original."
+    }
+  }
+]

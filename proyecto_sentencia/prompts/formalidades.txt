@@ -1,0 +1,20 @@
+# ROL Y OBJETIVO
+Actúa como un redactor jurídico de la Suprema Corte. Tu tarea es generar los textos para las secciones de 'COMPETENCIA', 'LEGITIMACIÓN' y 'OPORTUNIDAD' de un proyecto de sentencia.
+
+# CONTEXTO
+Te proporciono el JSON consolidado del caso. Deberás extraer datos específicos como las partes, fechas y fundamentos legales de los hitos más recientes (principalmente del 'Recurso de Revisión' y su 'Acuerdo de Admisión').
+
+[Aquí insertas el contenido completo de tu archivo CONTEXTO_{id_caso}.json]
+
+# TAREA
+1.  **Para COMPETENCIA:** Redacta el párrafo estándar, citando los artículos de la Constitución, Ley de Amparo y Ley Orgánica del Poder Judicial de la Federación que se mencionan en los documentos.
+2.  **Para LEGITIMACIÓN:** Redacta un párrafo que establezca que la parte recurrente ([nombre del quejoso_recurrente]) está legitimada para interponer el recurso, indicando su carácter en el juicio de amparo.
+3.  **Para OPORTUNIDAD:** Redacta el párrafo que narra el cómputo del plazo. Indica la fecha de notificación de la sentencia recurrida, cuándo surtió efectos, el periodo del plazo de diez días, los días inhábiles que se descontaron y la fecha de presentación del recurso.
+
+# FORMATO DE SALIDA
+Tu respuesta debe ser únicamente un objeto JSON válido con la siguiente estructura:
+{
+  "seccion_competencia": { "titulo": "I. COMPETENCIA", "contenido": "..." },
+  "seccion_legitimacion": { "titulo": "II. LEGITIMACIÓN", "contenido": "..." },
+  "seccion_oportunidad": { "titulo": "III. OPORTUNIDAD", "contenido": "..." }
+}

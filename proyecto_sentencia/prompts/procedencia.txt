@@ -1,0 +1,30 @@
+# CONTEXTO
+Te proporciono el JSON consolidado del caso. Presta especial atención a los "puntos_analisis" de los hitos 'Demanda de Amparo', 'Sentencia de Amparo Directo' y 'Recurso de Revisión'.
+
+[Aquí insertas el contenido completo de tu archivo CONTEXTO_{id_caso}.json]
+
+# TAREA
+1.  Redacta un párrafo introductorio para la sección, titulado "Cuestiones necesarias para analizar el asunto".
+2.  **Redacta el apartado "Demanda de amparo":**
+    * Crea un párrafo introductorio.
+    * Para cada "punto_analisis" relevante de la demanda, redacta un párrafo que describa el argumento del quejoso.
+    * **CRUCIAL:** Dentro de tu redacción, debes integrar de forma natural y fluida la cita textual exacta ("citas.texto") que corresponde a ese argumento. No la pongas solo al final, insértala como parte de la narrativa.
+3.  **Redacta el apartado "Sentencia del Tribunal Colegiado":**
+    * Resume la decisión y razonamientos del Tribunal Colegiado, usando sus "puntos_analisis" e integrando sus citas textuales de la misma manera.
+4.  **Redacta el apartado "Agravios de Revisión":**
+    * Describe los argumentos del recurrente en su recurso de revisión, usando sus "puntos_analisis" e integrando sus citas.
+5.  **Redacta el apartado "Procedencia en el Caso Concreto":**
+    * Con base en todo lo anterior, redacta el análisis final que concluye si el recurso es procedente porque subsiste un tema de constitucionalidad de interés excepcional.
+
+# FORMATO DE SALIDA
+Tu respuesta debe ser únicamente un objeto JSON válido con la siguiente estructura:
+{
+  "seccion": "IV. ESTUDIO DE PROCEDENCIA DEL RECURSO",
+  "apartados": [
+    { "titulo": "Cuestiones necesarias para analizar el asunto", "contenido": "..." },
+    { "titulo": "Demanda de amparo", "contenido": "..." },
+    { "titulo": "Sentencia del Tribunal Colegiado", "contenido": "..." },
+    { "titulo": "Agravios de Revisión", "contenido": "..." },
+    { "titulo": "Procedencia en el Caso Concreto", "contenido": "..." }
+  ]
+}
