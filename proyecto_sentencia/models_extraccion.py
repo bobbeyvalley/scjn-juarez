@@ -3,7 +3,7 @@ import os
 from datetime import datetime, date
 from enum import Enum
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 import logging
 
 # --- DEFINICIÓN DEL CATÁLOGO DE ETAPAS (Enum) ---
@@ -37,9 +37,67 @@ class PuntoAnalisis(BaseModel):
     identificado en el documento.
     """
     titulo: str = Field(..., max_length=100, description="Título conciso del punto (guía: máx. 10 palabras).")
-    resumen: str = Field(..., max_length=120, description="Resumen breve del punto de análisis.")
+    resumen: str = Field(..., max_length=200, description="Resumen breve del punto de análisis.")
     pagina: int = Field(..., description="Número de página donde se encuentra la cita principal.")
-    citas: List[Cita] = Field(..., min_items=1, max_items=3, description="Lista de citas textuales que soportan el punto.")
+    citas: List[Cita] = Field(..., min_items=0, max_items=5, description="Lista de citas textuales que soportan el punto.")
+
+    @field_validator('citas', mode='before')
+    @classmethod
+    def partir_citas_largas(cls, v):
+        """Parte citas largas en múltiples fragmentos preservando texto completo"""
+        citas_procesadas = []
+        
+        for cita in v:
+            texto_original = cita if isinstance(cita, str) else cita.get('texto', '')
+            
+            if len(texto_original) <= 500:
+                # Cita normal, solo convertir a objeto
+                citas_procesadas.append(Cita(texto=texto_original))
+            else:
+                # Cita larga: partir en chunks de palabras completas
+                chunks = cls._partir_en_chunks(texto_original, max_chars=450)
+                for chunk in chunks:
+                    citas_procesadas.append(Cita(texto=chunk))
+        
+        return citas_procesadas
+
+    @staticmethod
+    def _partir_en_chunks(texto: str, max_chars: int = 450) -> List[str]:
+        """Parte texto en chunks de palabras completas"""
+        if len(texto) <= max_chars:
+            return [texto]
+        
+        chunks = []
+        palabras = texto.split()
+        chunk_actual = ""
+        
+        for palabra in palabras:
+            nuevo_chunk = chunk_actual + " " + palabra if chunk_actual else palabra
+            
+            if len(nuevo_chunk) <= max_chars:
+                chunk_actual = nuevo_chunk
+            else:
+                if chunk_actual:
+                    chunks.append(chunk_actual)
+                    chunk_actual = palabra
+                else:
+                    chunks.append(palabra[:max_chars])
+                    chunk_actual = ""
+        
+        if chunk_actual:
+            chunks.append(chunk_actual)
+        
+        return chunks
+
+    @field_validator('resumen', mode='before')
+    @classmethod
+    def truncar_resumen(cls, v):
+        """Auto-trunca resumen si excede límite"""
+        if len(v) <= 200:
+            return v
+        # Truncar en palabra completa
+        palabras = v[:197].rsplit(' ', 1)
+        return palabras[0] + "..." if len(palabras) > 1 else v[:197] + "..."
 
 # --- Modelos Estructurales Jerárquicos ---
 
@@ -88,7 +146,16 @@ class SCJNDocumentoMapeado(BaseModel):
     identificacion_basica: IdentificacionBasica
     partes: Partes
     planteamiento_acto_reclamado: str = Field(..., max_length=280, description="Resumen de la controversia principal o la decisión impugnada en este documento.")
-    puntos_analisis: List[PuntoAnalisis] = Field(..., min_items=1)
+    puntos_analisis: List[PuntoAnalisis] = Field(..., min_items=0)
     decision_o_resolutivos: DecisionResolutivos
     normas_invocadas: List[str] = Field(..., description="Lista de artículos, leyes o tesis más relevantes mencionados.")
     metadatos_ubicacion: MetadatosUbicacion
+
+    @field_validator('planteamiento_acto_reclamado', mode='before')  
+    @classmethod
+    def truncar_planteamiento(cls, v):
+        """Auto-trunca planteamiento si excede límite"""
+        if len(v) <= 280:
+            return v
+        palabras = v[:277].rsplit(' ', 1)
+        return palabras[0] + "..." if len(palabras) > 1 else v[:277] + "..."

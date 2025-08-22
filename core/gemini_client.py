@@ -37,6 +37,14 @@ class GeminiClient:
     - 'Avocamiento'
     - 'Otra'
 
+    LÍMITES ESTRICTOS (CRÍTICO PARA FUNCIONAMIENTO):
+    - "titulo": MÁXIMO 50 caracteres
+    - "resumen": MÁXIMO 120 caracteres
+    - "planteamiento_acto_reclamado": MÁXIMO 280 caracteres
+    - "citas": MÁXIMO 500 caracteres cada fragmento textual
+
+    Si un resumen natural excede 120 caracteres, DEBES resumirlo más sin perder el sentido.
+
     Responde ÚNICAMENTE con un objeto JSON con esta estructura exacta:
     {
     "documento": "Nombre exacto del archivo",

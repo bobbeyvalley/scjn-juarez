@@ -207,60 +207,60 @@ class SCJNAnalyzer:
                 print(json.dumps(resultado_json, indent=2, ensure_ascii=False))
                 
                 # TRANSFORMAR ESTRUCTURA ANIDADA A PLANA
-                def flatten_gemini_response(json_data):
-                    """Convierte la estructura anidada de Gemini a estructura plana para Pydantic"""
-                    flattened = {}
+            #     def flatten_gemini_response(json_data):
+            #         """Convierte la estructura anidada de Gemini a estructura plana para Pydantic"""
+            #         flattened = {}
                     
-                    # Copiar campos de nivel superior
-                    flattened["documento"] = json_data.get("documento", "")
+            #         # Copiar campos de nivel superior
+            #         flattened["documento"] = json_data.get("documento", "")
                     
-                    # Extraer de identificacion_basica
-                    if "identificacion_basica" in json_data:
-                        ib = json_data["identificacion_basica"]
-                        flattened["tipo"] = ib.get("tipo_documento", "")
-                        flattened["fecha_expedicion"] = ib.get("fecha_expedicion", "")
-                        flattened["organo_emisor"] = ib.get("organo_emisor", "")
-                        expediente_raw = ib.get("expediente_citados", "")
-                        if isinstance(expediente_raw, list):
-                            flattened["expediente"] = ", ".join(expediente_raw)  # Convertir lista a string
-                        else:
-                            flattened["expediente"] = str(expediente_raw)
-                        flattened["folios"] = ib.get("numero_fojas", None)
+            #         # Extraer de identificacion_basica
+            #         if "identificacion_basica" in json_data:
+            #             ib = json_data["identificacion_basica"]
+            #             flattened["tipo"] = ib.get("tipo_documento", "")
+            #             flattened["fecha_expedicion"] = ib.get("fecha_expedicion", "")
+            #             flattened["organo_emisor"] = ib.get("organo_emisor", "")
+            #             expediente_raw = ib.get("expediente_citados", "")
+            #             if isinstance(expediente_raw, list):
+            #                 flattened["expediente"] = ", ".join(expediente_raw)  # Convertir lista a string
+            #             else:
+            #                 flattened["expediente"] = str(expediente_raw)
+            #             flattened["folios"] = ib.get("numero_fojas", None)
                     
-                    # Extraer de partes_relevantes
-                    if "partes_relevantes" in json_data:
-                        pr = json_data["partes_relevantes"]
-                        flattened["partes"] = {
-                            "quejoso": pr.get("quejoso_promovente_recurrente", ""),
-                            "autoridad_responsable": pr.get("autoridad_responsable", ""),
-                            "terceros_interesados": pr.get("terceros_interesados", None)
-                        }
+            #         # Extraer de partes_relevantes
+            #         if "partes_relevantes" in json_data:
+            #             pr = json_data["partes_relevantes"]
+            #             flattened["partes"] = {
+            #                 "quejoso": pr.get("quejoso_promovente_recurrente", ""),
+            #                 "autoridad_responsable": pr.get("autoridad_responsable", ""),
+            #                 "terceros_interesados": pr.get("terceros_interesados", None)
+            #             }
                     
-                    # Extraer planteamiento
-                    flattened["planteamiento"] = json_data.get("planteamiento_o_acto_reclamado", "")
+            #         # Extraer planteamiento
+            #         flattened["planteamiento"] = json_data.get("planteamiento_o_acto_reclamado", "")
                     
-                    # Copiar puntos_analisis (ya está bien)
-                    flattened["puntos_analisis"] = json_data.get("puntos_analisis", [])
+            #         # Copiar puntos_analisis (ya está bien)
+            #         flattened["puntos_analisis"] = json_data.get("puntos_analisis", [])
                     
-                    # Extraer normas (puede tener nombres diferentes)
-                    flattened["normas_invocadas"] = json_data.get("normas_invocadas", 
-                        json_data.get("normas_o_precedentes_invocados", []))
+            #         # Extraer normas (puede tener nombres diferentes)
+            #         flattened["normas_invocadas"] = json_data.get("normas_invocadas", 
+            #             json_data.get("normas_o_precedentes_invocados", []))
                     
-                    # Extraer pretensiones (puede tener nombres diferentes)
-                    flattened["pretensiones"] = json_data.get("pretensiones", 
-                        json_data.get("pretensiones_o_resolucion", []))
+            #         # Extraer pretensiones (puede tener nombres diferentes)
+            #         flattened["pretensiones"] = json_data.get("pretensiones", 
+            #             json_data.get("pretensiones_o_resolucion", []))
                     
-                    # Extraer de metadatos_de_ubicacion
-                    if "metadatos_de_ubicacion" in json_data:
-                        mu = json_data["metadatos_de_ubicacion"]
-                        flattened["paginas_pdf"] = mu.get("paginas_pdf", [1, 1])
-                    else:
-                        flattened["paginas_pdf"] = json_data.get("paginas_pdf", [1, 1])
+            #         # Extraer de metadatos_de_ubicacion
+            #         if "metadatos_de_ubicacion" in json_data:
+            #             mu = json_data["metadatos_de_ubicacion"]
+            #             flattened["paginas_pdf"] = mu.get("paginas_pdf", [1, 1])
+            #         else:
+            #             flattened["paginas_pdf"] = json_data.get("paginas_pdf", [1, 1])
                     
-                    return flattened
+            #         return flattened
 
-                # TRANSFORMAR EL JSON
-                resultado_json = flatten_gemini_response(resultado_json)
+            #     # TRANSFORMAR EL JSON
+            #     resultado_json = flatten_gemini_response(resultado_json)
 
                 print(f"\n🔍 DEBUG - JSON transformado para Pydantic:")
                 print(json.dumps(resultado_json, indent=2, ensure_ascii=False))
@@ -268,7 +268,7 @@ class SCJNAnalyzer:
 
 
                 # Validar estructura
-                documento_validado = SCJN_Documento(**resultado_json)
+                documento_validado = SCJNDocumentoMapeado(**resultado_json)
                 
                 # Guardar JSON individual
                 end_time = time.time()
