@@ -24,63 +24,53 @@ class GeminiClient:
         self.reporte_prompt = self._load_reporte_prompt()
     
     def _load_mapeo_prompt(self) -> str:
-        """Carga el prompt para mapeo de documentos"""
-        return """Actúa como experto en análisis documental y legal desde la perspectiva del marco constitucional y regulatorio de México y analiza la siguiente información para poder identificar información relevante de los siguientes documentos que permitan identificar la competencia, legitimidad y procedencia de la intervención de la suprema corte de justicia en la resolución de este asunto.
-Sólo responde con el objeto JSON, no des explicaciones. La respuesta es en Español Mexicano
-A partir del documento que se te proporcione genera un objeto json con las siguientes llaves:
+        """Carga el prompt para mapeo de documentos - Versión V2"""
+        return """Actúa como un experto analista legal especializado en el sistema judicial mexicano. Tu tarea es extraer información estructurada de documentos judiciales para reconstruir la cronología de un caso ante la Suprema Corte de Justicia de la Nación. Analiza el documento proporcionado y completa los siguientes campos con la máxima precisión.
 
-Nombre del documento
-Incluye exactamente el nombre del archivo (campo "documento").
-Identificación básica
-Extrae: tipo de documento, fecha de expedición, órgano emisor, expediente(s) citados y número de fojas o páginas.
-Partes relevantes
-Quejoso / promovente / recurrente
-Autoridad responsable
-Terceros interesados (si los hay)
-Planteamiento o acto reclamado
-Frase breve (≤ 280 caracteres) que resuma la controversia o decisión impugnada.
-Puntos de análisis (array)
-Para cada punto:
-"titulo": máx. 10 palabras
-"resumen": máx. 120 caracteres
-"pagina": página(s) exacta(s) dentro del PDF
-"citas": 1-3 fragmentos textuales literalmente copiados (≤ 500 caracteres c/u) que respalden el punto.
-Normas o precedentes invocados
-Lista breve de artículos constitucionales, leyes o tesis jurisprudenciales mencionados, sólo mencionados a un nivel general sin extraer el detalle de cada documento citado.
-Pretensiones o resolución
-Array con cada petición o determinación final.
-Metadatos de ubicación
-"paginas_pdf": [inicio, fin] del documento en el PDF original.
-Profundidad
-Conserva jerarquía: "conceptos_violacion" o "acuerdos" como sub-arrays cuando aplique.
+    IMPORTANTE: El campo 'etapa_procesal_resuelta' DEBE ser uno de los siguientes valores exactos:
+    - 'Juicio de Origen'
+    - 'Recurso de Apelación' 
+    - 'Demanda de Amparo'
+    - 'Sentencia de Amparo Directo'
+    - 'Recurso de Revisión'
+    - 'Acuerdo de Admisión de Revisión'
+    - 'Avocamiento'
+    - 'Otra'
 
-Ejemplo de salida esperada (solo ilustrativo):
-{
-  "documento": "ADMISIÓN ADR 1241 2024.pdf",
-  "tipo": "Acuerdo de Admisión",
-  "fecha_expedicion": "2024-02-12",
-  "organo_emisor": "Presidencia de la SCJN",
-  "expediente": "1241/2024",
-  "folios": 11,
-  "paginas_pdf": [1, 11],
-  "partes": {
-    "quejoso": "Corporativo Ferloguer, S.A. de C.V.",
-    "autoridad_responsable": "6ª Sala Civil TSJCDMX"
-  },
-  "planteamiento": "Consecuencias civiles de la falsedad en la promesa de decir verdad.",
-  "puntos_analisis": [
+    Responde ÚNICAMENTE con un objeto JSON con esta estructura exacta:
     {
-      "titulo": "Interpretación art. 130",
-      "resumen": "Solicita aclarar efectos civiles de la promesa incumplida.",
-      "pagina": 3,
-      "citas": [
-        "¿puede acaso hacer y tres manifestaciones diversas… y pretender que todas sean válidas?"
-        ]
+    "documento": "Nombre exacto del archivo",
+    "identificacion_basica": {
+        "tipo_documento": "Tipo de actuación",
+        "etapa_procesal_resuelta": "Valor del enum exacto",
+        "fecha_resolucion": "AAAA-MM-DD",
+        "organo_emisor": "Tribunal que emite",
+        "expedientes_principales": ["array de expedientes"],
+        "folios": numero_o_null
+    },
+    "partes": {
+        "quejoso_recurrente": "Nombre",
+        "autoridad_responsable": "Autoridad",
+        "terceros_interesados": ["array o null"]
+    },
+    "planteamiento_acto_reclamado": "Resumen ≤ 280 chars",
+    "puntos_analisis": [
+        {
+        "titulo": "≤ 10 palabras",
+        "resumen": "≤ 120 chars", 
+        "pagina": numero,
+        "citas": ["fragmentos textuales ≤ 500 chars"]
+        }
+    ],
+    "decision_o_resolutivos": {
+        "sentido_del_fallo": "Resultado principal",
+        "puntos_resolutivos": ["array de puntos resolutivos"]
+    },
+    "normas_invocadas": ["array de normas"],
+    "metadatos_ubicacion": {
+        "paginas_pdf": [inicio, fin]
     }
-  ],
-  "normas_invocadas": ["Art. 130 CPEUM", "Art. 107 fracc. IX CPEUM"],
-  "pretensiones": ["Admitir el recurso de revisión"]
-}"""
+    }"""
 
     def _load_reporte_prompt(self) -> str:
         """Carga el prompt para generación de reportes ejecutivos"""

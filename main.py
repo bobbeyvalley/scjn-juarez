@@ -19,12 +19,15 @@ from tqdm import tqdm
 # Agregar directorio actual al path para imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from core.models import SCJN_Documento, DocumentoMetadata, BitacoraEntry, ExpedienteInfo
+#from core.models import SCJN_Documento, DocumentoMetadata, BitacoraEntry, ExpedienteInfo | Import anterior
+from core.models import DocumentoMetadata, BitacoraEntry, ExpedienteInfo
 from core.gemini_client import GeminiClient
 from processors.pdf_processor import PDFProcessor
 from processors.docx_processor import DOCXProcessor
 from processors.txt_processor import TXTProcessor
 from processors.image_processor import ImageProcessor
+from proyecto_sentencia.models_extraccion import SCJNDocumentoMapeado
+from proyecto_sentencia import crear_contexto_del_caso_robusto
 
 class ConfiguracionProcesamiento:
     """Parámetros configurables del procesamiento"""
@@ -504,12 +507,45 @@ class SCJNAnalyzer:
         
         print("="*80)
 
+def ejecutar_generacion_proyecto(carpeta_expediente: Path, expediente: str):
+    """Ejecuta la generación del proyecto de sentencia"""
+    try:
+        # Buscar JSONs procesados en la carpeta jsons/
+        carpeta_jsons = carpeta_expediente / "jsons"
+        if not carpeta_jsons.exists():
+            print("❌ Error: No se encontró carpeta 'jsons'. Ejecuta primero la extracción.")
+            return
+        
+        # Buscar archivos JSON mapeados
+        archivos_json = list(carpeta_jsons.glob("*_mapeado.json"))
+        if not archivos_json:
+            print("❌ Error: No se encontraron archivos JSON mapeados.")
+            return
+        
+        print(f"📁 Encontrados {len(archivos_json)} documentos procesados")
+        
+        # Crear contexto del caso
+        print("🔄 Consolidando contexto cronológico...")
+        contexto = crear_contexto_del_caso_robusto(
+            lista_archivos_json=[str(f) for f in archivos_json],
+            id_caso=expediente,
+            output_dir=str(carpeta_expediente)
+        )
+        
+        print(f"✅ Contexto generado: CONTEXTO_{expediente}.json")
+        print("🎉 ¡Proyecto de sentencia listo para generación de secciones!")
+        
+    except Exception as e:
+        print(f"❌ Error en generación de proyecto: {e}")
+
 
 def main():
     """Función principal"""
     parser = argparse.ArgumentParser(description='Procesador de Expedientes SCJN')
     parser.add_argument('--expediente', type=str, required=True, 
                        help='Ruta a la carpeta del expediente')
+    parser.add_argument('--modo', choices=['extraccion', 'proyecto', 'completo'], 
+                       default='completo', help='Modo de procesamiento')
     parser.add_argument('--timeout', type=int, default=120,
                        help='Timeout por documento en segundos (default: 120)')
     parser.add_argument('--reintentos', type=int, default=2,
@@ -539,16 +575,20 @@ def main():
     analyzer = SCJNAnalyzer(config)
     
     try:
-        # Procesar expediente completo
-        expediente_completo = analyzer.procesar_expediente_completo(carpeta_expediente, expediente)
+        # 🆕 LÓGICA EXTENDIDA POR MODO
+        if args.modo in ['extraccion', 'completo']:
+            print("🚀 Ejecutando extracción de documentos...")
+            expediente_completo = analyzer.procesar_expediente_completo(carpeta_expediente, expediente)
+            
+            if expediente_completo:
+                analyzer.generar_reporte_ejecutivo(expediente)
+            
+            analyzer.mostrar_resumen_final(expediente_completo)
         
-        # Generar reporte si está completo
-        if expediente_completo:
-            analyzer.generar_reporte_ejecutivo(expediente)
-        
-        # Mostrar resumen final
-        analyzer.mostrar_resumen_final(expediente_completo)
-        
+        if args.modo in ['proyecto', 'completo']:
+            print("\n📋 Ejecutando generación de proyecto de sentencia...")
+            ejecutar_generacion_proyecto(carpeta_expediente, expediente)
+            
     except KeyboardInterrupt:
         print("\n🛑 Proceso interrumpido por el usuario")
     except Exception as e:
