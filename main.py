@@ -29,6 +29,7 @@ from processors.image_processor import ImageProcessor
 from proyecto_sentencia.models_extraccion import SCJNDocumentoMapeado
 from proyecto_sentencia import crear_contexto_del_caso_robusto
 from proyecto_sentencia.models_secciones import SeccionAntecedentes, SeccionFormalidades, SeccionProcedencia
+from core.word_generator import convertir_markdown_a_word
 
 class ConfiguracionProcesamiento:
     """Parámetros configurables del procesamiento"""
@@ -685,6 +686,31 @@ def generar_secciones_proyecto(carpeta_expediente: Path, expediente: str):
             archivo_proyecto = carpeta_reporte / f"proyecto_sentencia_{expediente}_{timestamp}.md"
             with open(archivo_proyecto, 'w', encoding='utf-8') as f:
                 f.write(documento_final)
+
+            # 🆕 GENERAR DOCUMENTO WORD AUTOMÁTICAMENTE
+            print(f"📝 Generando documento Word profesional...")
+            try:
+                archivo_word = convertir_markdown_a_word(
+                    archivo_markdown=archivo_proyecto_md,
+                    expediente=expediente,
+                    carpeta_salida=carpeta_reporte,
+                    contexto_caso=contexto,
+                    nombre_ministro=nombre_ministro,
+                    nombre_secretario=nombre_secretario,
+                    nombre_secretario_aux=nombre_secretario_aux,
+                    colaboradores=colaboradores
+                )
+                print(f"  ✅ Documento Word generado: {archivo_word.name}")
+                
+                # Actualizar progreso con información del Word
+                progreso_existente['documento_word'] = {
+                    'archivo': archivo_word.name,
+                    'timestamp': datetime.now().isoformat()
+                }
+                
+            except Exception as e:
+                print(f"  ⚠️ Error generando Word (Markdown disponible): {e}")
+            
             
             # Actualizar progreso final
             progreso_existente['documento_final'] = {
@@ -904,6 +930,18 @@ def main():
             print("\n📝 Ejecutando generación de secciones...")
             generar_secciones_proyecto(carpeta_expediente, expediente)
             
+        # Capturar variables para formato SCJN
+        print("\n👤 Información del personal jurisdiccional:")
+        nombre_ministro = input("Nombre del Ministro Ponente: ").strip()
+        nombre_secretario = input("Nombre del Secretario: ").strip()
+        nombre_secretario_aux = input("Nombre del Secretario Auxiliar (opcional): ").strip() or None
+        colaboradores = []
+        while True:
+            colab = input("Colaborador adicional (Enter para continuar): ").strip()
+            if not colab:
+                break
+            colaboradores.append(colab)
+
     except KeyboardInterrupt:
         print("\n🛑 Proceso interrumpido por el usuario")
     except Exception as e:
