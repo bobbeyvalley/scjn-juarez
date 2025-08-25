@@ -233,3 +233,211 @@ class GeminiClient:
             return "image/png"
         else:
             return "image/jpeg"  # Default
+
+    # AGREGAR ESTOS MÉTODOS AL FINAL DE LA CLASE GeminiClient en core/gemini_client.py
+
+    def generar_seccion(self, prompt_type: str, contexto: dict, 
+                    response_format: str = "application/json") -> Tuple[Dict[str, Any], int]:
+        """
+        Genera una sección específica del proyecto de sentencia
+        
+        Args:
+            prompt_type: Tipo de sección ('antecedentes', 'formalidades', 'procedencia')
+            contexto: Diccionario con el contexto del caso (CONTEXTO_{expediente}.json)
+            response_format: Formato de respuesta ('application/json' o 'text/plain')
+        
+        Returns:
+            Tuple[Dict|str, int]: (Resultado, tokens utilizados)
+        """
+        start_time = time.time()
+        
+        # Cargar prompt específico según el tipo
+        prompt_template = self._load_seccion_prompt(prompt_type)
+        
+        # Insertar contexto en el prompt
+        prompt_completo = self._insertar_contexto_en_prompt(prompt_template, contexto)
+        
+        # Preparar contenido para Gemini
+        contents = [
+            types.Content(
+                role="user", 
+                parts=[types.Part.from_text(text=json.dumps(contexto, indent=2, ensure_ascii=False))]
+            )
+        ]
+
+        config = types.GenerateContentConfig(
+            temperature=0,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            response_mime_type=response_format,
+            system_instruction=[
+                types.Part.from_text(text=prompt_completo)
+            ]
+        )
+
+        try:
+            response = self.client.models.generate_content(
+                model=self.model,
+                contents=contents,
+                config=config
+            )
+            
+            # Calcular tokens estimados
+            tokens_estimados = len(json.dumps(contexto)) // 4
+            
+            # # # 🆕 DEBUG: GUARDAR RESPUESTA RAW ANTES DE PARSEAR
+            # if prompt_type == "procedencia":  # Solo para la sección problemática
+            #     debug_file = f"debug_response_{prompt_type}_{int(time.time())}.txt"
+            #     with open(debug_file, 'w', encoding='utf-8') as f:
+            #         f.write("=== RESPUESTA CRUDA DE GEMINI ===\n")
+            #         f.write(response.text)
+            #         f.write("\n\n=== FIN DE RESPUESTA ===")
+            #     print(f"🐛 DEBUG: Respuesta guardada en {debug_file}")
+                
+            #     # También imprimir los primeros y últimos caracteres
+            #     print(f"🐛 DEBUG: Primeros 500 chars: {response.text[:500]}")
+            #     print(f"🐛 DEBUG: Últimos 500 chars: {response.text[-500:]}")
+            #     print(f"🐛 DEBUG: Longitud total: {len(response.text)} caracteres")
+
+            # Parsear respuesta según formato
+            if response_format == "application/json":
+                resultado = json.loads(response.text)
+            else:
+                resultado = response.text
+            
+            return resultado, tokens_estimados
+            
+        except Exception as e:
+            raise Exception(f"Error generando sección {prompt_type}: {str(e)}")
+
+    def _load_seccion_prompt(self, prompt_type: str) -> str:
+        """Carga el prompt específico para cada tipo de sección"""
+        
+        prompts = {
+            'antecedentes': """# ROL Y OBJETIVO
+    Actúa como Secretario de Estudio y Cuenta de la Suprema Corte de Justicia de la Nación. Tu tarea es redactar la sección de 'ANTECEDENTES Y TRÁMITE' de un proyecto de sentencia.
+
+    # CONTEXTO
+    A continuación, te proporciono un JSON que contiene la cronología de hitos procesales de un caso, desde su origen hasta su llegada a esta Suprema Corte. Cada hito contiene información clave como las partes, la fecha, el órgano emisor y el sentido del fallo.
+
+    # TAREA
+    1. Lee cronológicamente cada uno de los "hitos_procesales".
+    2. Para cada hito, redacta un párrafo claro, conciso y en lenguaje jurídico formal que describa lo sucedido en esa etapa. Utiliza la información proporcionada en cada objeto JSON del hito para tu redacción.
+    3. **REFERENCIAS OBLIGATORIAS**: En cada párrafo, DEBES incluir referencias explícitas al documento original usando el siguiente formato:
+    - "Conforme se desprende de [tipo de documento] ([nombre_archivo], página X)..."
+    - "Según consta en [tipo de documento] ([nombre_archivo], páginas X-Y)..."
+    - "Como se advierte del [tipo de documento] ([nombre_archivo], folio X)..."
+    
+    Donde:
+    - [tipo de documento] = etapa_procesal_resuelta en español (ej. "demanda de amparo", "sentencia recurrida", "recurso de revisión")
+    - [nombre_archivo] = campo "documento" exacto
+    - página/páginas = extraído de "paginas_pdf" o "puntos_analisis[].pagina"
+
+    4. Estructura tu respuesta en un formato JSON que contenga una lista de objetos, donde cada objeto represente un subtítulo y el texto narrativo correspondiente a esa etapa del proceso.
+
+    # FORMATO DE SALIDA
+    Tu respuesta debe ser únicamente un objeto JSON válido con la siguiente estructura:
+    {
+    "seccion": "ANTECEDENTES Y TRÁMITE",
+    "contenido": [
+        { "subtitulo": "Juicio de Origen", "texto_narrativo": "..." },
+        { "subtitulo": "Sentencia Definitiva", "texto_narrativo": "..." },
+        { "subtitulo": "Recurso de Apelación", "texto_narrativo": "..." },
+        { "subtitulo": "Primer Juicio de Amparo Directo", "texto_narrativo": "..." },
+        { "subtitulo": "Segundo Juicio de Amparo Directo", "texto_narrativo": "..." },
+        { "subtitulo": "Recurso de Revisión", "texto_narrativo": "..." },
+        { "subtitulo": "Trámite ante esta Suprema Corte", "texto_narrativo": "..." }
+    ]
+    }
+
+    **EJEMPLO DE PÁRRAFO CON REFERENCIAS:**
+    "Mediante escrito presentado el veinticuatro de marzo de dos mil veintitrés, conforme se desprende de la demanda de amparo directo (AD. 71/2023, páginas 1-33), VINICIO ANDRES PEÑA TAMAYO, por propio derecho, promovió juicio de amparo directo contra la sentencia definitiva..."
+    """,
+
+            'formalidades': """# ROL Y OBJETIVO
+    Actúa como un redactor jurídico de la Suprema Corte. Tu tarea es generar los textos para las secciones de 'COMPETENCIA', 'LEGITIMACIÓN' y 'OPORTUNIDAD' de un proyecto de sentencia.
+
+    # TAREA
+    1. **Para COMPETENCIA:** Redacta el párrafo estándar, citando los artículos de la Constitución, Ley de Amparo y Ley Orgánica del Poder Judicial de la Federación que se mencionan en los documentos.
+    2. **Para LEGITIMACIÓN:** Redacta un párrafo que establezca que la parte recurrente está legitimada para interponer el recurso, indicando su carácter en el juicio de amparo.
+    3. **Para OPORTUNIDAD:** Redacta el párrafo que narra el cómputo del plazo. Indica la fecha de notificación de la sentencia recurrida, cuándo surtió efectos, el periodo del plazo de diez días, los días inhábiles que se descontaron y la fecha de presentación del recurso.
+
+    # REFERENCIAS OBLIGATORIAS
+    **DEBES incluir referencias a los documentos originales en cada sección usando este formato:**
+    - "Según se advierte del acuerdo de admisión ([nombre_archivo], página X)..."
+    - "Conforme consta en el recurso de revisión ([nombre_archivo], páginas X-Y)..."
+    - "Como se desprende de la notificación ([nombre_archivo])..."
+
+    **EXTRAE las fechas, plazos y datos específicos directamente de los documentos del contexto proporcionado.**
+
+    # FORMATO DE SALIDA
+    Tu respuesta debe ser únicamente un objeto JSON válido con la siguiente estructura:
+    {
+    "seccion_competencia": { "titulo": "I. COMPETENCIA", "contenido": "..." },
+    "seccion_legitimacion": { "titulo": "II. LEGITIMACIÓN", "contenido": "..." },
+    "seccion_oportunidad": { "titulo": "III. OPORTUNIDAD", "contenido": "..." }
+    }
+
+    **EJEMPLO CON REFERENCIAS:**
+    "El recurso de revisión fue interpuesto de forma oportuna. Según se advierte del oficio de notificación (Oficio de Notificación de Sentencia de Amparo Directo, página 1), la sentencia recurrida se notificó por oficio el nueve de agosto de dos mil veintitrés..."
+    """,
+
+            'procedencia': """# TAREA
+    1. Redacta un párrafo introductorio para la sección, titulado "Cuestiones necesarias para analizar el asunto".
+    2. **Redacta el apartado "Demanda de amparo":**
+    * Crea un párrafo introductorio.
+    * Para cada "punto_analisis" relevante de la demanda, redacta un párrafo que describa el argumento del quejoso.
+    * **CRUCIAL:** Dentro de tu redacción, debes integrar de forma natural y fluida la cita textual exacta ("citas.texto") que corresponde a ese argumento. No la pongas solo al final, insértala como parte de la narrativa.
+    3. **Redacta el apartado "Sentencia del Tribunal Colegiado":**
+    * Resume la decisión y razonamientos del Tribunal Colegiado, usando sus "puntos_analisis" e integrando sus citas textuales de la misma manera.
+    4. **Redacta el apartado "Agravios de Revisión":**
+    * Describe los argumentos del recurrente en su recurso de revisión, usando sus "puntos_analisis" e integrando sus citas.
+    5. **Redacta el apartado "Procedencia en el Caso Concreto":**
+    * Con base en todo lo anterior, redacta el análisis final que concluye si el recurso es procedente porque subsiste un tema de constitucionalidad de interés excepcional.
+
+    # REFERENCIAS OBLIGATORIAS EN CADA APARTADO
+    **DEBES incluir referencias específicas a los documentos originales:**
+
+    - **Para Demanda de amparo:** "Conforme se desprende de la demanda de amparo ([nombre_archivo], páginas X-Y)..."
+    - **Para Sentencia del Tribunal:** "Según consta en la sentencia recurrida ([nombre_archivo], página X)..."
+    - **Para Agravios de Revisión:** "Como se advierte del recurso de revisión ([nombre_archivo], páginas X-Y)..."
+    - **Para Procedencia:** "Según se estableció en el acuerdo de admisión ([nombre_archivo], página X)..."
+
+    **EXTRAE la información específica de páginas de los campos:**
+    - `puntos_analisis[].pagina` para referencias específicas
+    - `paginas_pdf` para rangos de páginas del documento
+    - `documento` para el nombre exacto del archivo
+
+    # FORMATO DE SALIDA
+    Tu respuesta debe ser únicamente un objeto JSON válido con la siguiente estructura:
+    {
+    "seccion": "IV. ESTUDIO DE PROCEDENCIA DEL RECURSO",
+    "apartados": [
+        { "titulo": "Cuestiones necesarias para analizar el asunto", "contenido": "..." },
+        { "titulo": "Demanda de amparo", "contenido": "..." },
+        { "titulo": "Sentencia del Tribunal Colegiado", "contenido": "..." },
+        { "titulo": "Agravios de Revisión", "contenido": "..." },
+        { "titulo": "Procedencia en el Caso Concreto", "contenido": "..." }
+    ]
+    }
+
+    **EJEMPLO CON REFERENCIAS Y CITAS INTEGRADAS:**
+    "El quejoso, Vinicio Andrés Peña Tamayo, conforme se desprende de la demanda de amparo directo (AD. 71/2023, página 5), alegó violación a la garantía de legalidad argumentando que 'nadie puede ser privado de la libertad si no se sigue un juicio en que se observen las formalidades esenciales del procedimiento', señalando específicamente que..."
+    """
+        }
+        
+        if prompt_type not in prompts:
+            raise ValueError(f"Tipo de prompt no reconocido: {prompt_type}. Tipos válidos: {list(prompts.keys())}")
+        
+        return prompts[prompt_type]
+
+    def _insertar_contexto_en_prompt(self, prompt_template: str, contexto: dict) -> str:
+        """Inserta información del contexto en el prompt si es necesario"""
+        # Por ahora, el contexto se pasa como contenido separado
+        # Pero aquí podrías hacer sustituciones específicas si el prompt lo requiere
+        
+        # Ejemplo de sustitución dinámica:
+        if "expediente_principal" in contexto.get("metadata_caso", {}):
+            expediente = contexto["metadata_caso"]["expediente_principal"]
+            prompt_template = prompt_template.replace("[EXPEDIENTE]", expediente)
+        
+        return prompt_template

@@ -28,6 +28,7 @@ from processors.txt_processor import TXTProcessor
 from processors.image_processor import ImageProcessor
 from proyecto_sentencia.models_extraccion import SCJNDocumentoMapeado
 from proyecto_sentencia import crear_contexto_del_caso_robusto
+from proyecto_sentencia.models_secciones import SeccionAntecedentes, SeccionFormalidades, SeccionProcedencia
 
 class ConfiguracionProcesamiento:
     """Parámetros configurables del procesamiento"""
@@ -538,13 +539,325 @@ def ejecutar_generacion_proyecto(carpeta_expediente: Path, expediente: str):
     except Exception as e:
         print(f"❌ Error en generación de proyecto: {e}")
 
+def generar_secciones_proyecto(carpeta_expediente: Path, expediente: str):
+    """
+    Genera las 3 secciones principales del proyecto de sentencia
+    CON SISTEMA DE CHECKPOINT Y RESUME AUTOMÁTICO
+    
+    Args:
+        carpeta_expediente: Ruta al expediente
+        expediente: Nombre del expediente
+    """
+    try:
+        print(f"\n📋 Generando secciones del proyecto de sentencia para {expediente}...")
+        
+        # 1. Verificar que existe el contexto
+        archivo_contexto = carpeta_expediente / f"CONTEXTO_{expediente}.json"
+        if not archivo_contexto.exists():
+            print("❌ Error: No se encontró el archivo de contexto. Ejecuta primero la generación de contexto.")
+            return
+        
+        # 2. Cargar contexto
+        print("📖 Cargando contexto del caso...")
+        with open(archivo_contexto, 'r', encoding='utf-8') as f:
+            contexto = json.load(f)
+        
+        # 3. Crear carpeta de salida en reporte/
+        carpeta_reporte = carpeta_expediente / "reporte"
+        carpeta_reporte.mkdir(exist_ok=True)
+        
+        # 4. Sistema de checkpoint - verificar progreso existente
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        archivo_checkpoint = carpeta_reporte / f"checkpoint_secciones_{expediente}.json"
+        
+        progreso_existente = cargar_checkpoint(archivo_checkpoint)
+        print(f"🔍 Estado del checkpoint: {progreso_existente['estado']}")
+        
+        # 5. Inicializar cliente Gemini
+        gemini_client = GeminiClient()
+        
+        # 6. Definir pipeline de secciones
+        pipeline_secciones = [
+            {
+                'nombre': 'antecedentes',
+                'tipo_prompt': 'antecedentes', 
+                'modelo_validacion': SeccionAntecedentes,
+                'descripcion': 'Antecedentes y Trámite'
+            },
+            {
+                'nombre': 'formalidades',
+                'tipo_prompt': 'formalidades',
+                'modelo_validacion': SeccionFormalidades,
+                'descripcion': 'Formalidades (Competencia, Legitimación, Oportunidad)'
+            },
+            {
+                'nombre': 'procedencia',
+                'tipo_prompt': 'procedencia',
+                'modelo_validacion': SeccionProcedencia,
+                'descripcion': 'Estudio de Procedencia del Recurso'
+            }
+        ]
+        
+        print(f"\n🔄 Procesando {len(pipeline_secciones)} secciones...")
+        if progreso_existente['secciones_completadas']:
+            print(f"📋 Secciones ya completadas: {list(progreso_existente['secciones_completadas'].keys())}")
+        
+        # 7. Procesar cada sección con resiliencia
+        for seccion_config in pipeline_secciones:
+            nombre_seccion = seccion_config['nombre']
+            
+            # Verificar si ya está completada
+            if nombre_seccion in progreso_existente['secciones_completadas']:
+                print(f"  ✅ {seccion_config['descripcion']} - Ya completada, omitiendo...")
+                continue
+            
+            print(f"  📝 Generando {seccion_config['descripcion']}...")
+            
+            try:
+                # Intentar generar la sección
+                seccion_raw, tokens_usados = gemini_client.generar_seccion(
+                    prompt_type=seccion_config['tipo_prompt'],
+                    contexto=contexto,
+                    response_format="application/json"
+                )
+                
+                # Validar con Pydantic
+                seccion_validada = seccion_config['modelo_validacion'](**seccion_raw)
+                seccion_data = seccion_validada.model_dump()
+                
+                # GUARDAR INMEDIATAMENTE tras éxito
+                archivo_seccion = carpeta_reporte / f"seccion_{nombre_seccion}_{expediente}_{timestamp}.json"
+                with open(archivo_seccion, 'w', encoding='utf-8') as f:
+                    json.dump(seccion_data, f, indent=2, ensure_ascii=False)
+                
+                # Actualizar checkpoint
+                progreso_existente['secciones_completadas'][nombre_seccion] = {
+                    'archivo': archivo_seccion.name,
+                    'tokens': tokens_usados,
+                    'timestamp': datetime.now().isoformat(),
+                    'status': 'completada'
+                }
+                progreso_existente['tokens_totales'] += tokens_usados
+                progreso_existente['ultima_actualizacion'] = datetime.now().isoformat()
+                
+                # Guardar checkpoint actualizado
+                guardar_checkpoint(archivo_checkpoint, progreso_existente)
+                
+                print(f"    ✅ {seccion_config['descripcion']} completada. Tokens: {tokens_usados:,}")
+                
+            except Exception as e:
+                print(f"    ❌ Error en {seccion_config['descripcion']}: {e}")
+                
+                # Registrar error en checkpoint
+                progreso_existente['errores'].append({
+                    'seccion': nombre_seccion,
+                    'error': str(e),
+                    'timestamp': datetime.now().isoformat()
+                })
+                progreso_existente['ultima_actualizacion'] = datetime.now().isoformat()
+                guardar_checkpoint(archivo_checkpoint, progreso_existente)
+                
+                print(f"    🔄 Continuando con las siguientes secciones...")
+                continue  # CONTINÚA en lugar de return
+        
+        # 8. Generar documento final con las secciones disponibles
+        secciones_disponibles = progreso_existente['secciones_completadas']
+        
+        if secciones_disponibles:
+            print(f"\n📚 Ensamblando proyecto con {len(secciones_disponibles)} secciones disponibles...")
+            
+            # Cargar secciones completadas
+            secciones_cargadas = {}
+            for nombre_seccion, info_seccion in secciones_disponibles.items():
+                archivo_seccion = carpeta_reporte / info_seccion['archivo']
+                if archivo_seccion.exists():
+                    with open(archivo_seccion, 'r', encoding='utf-8') as f:
+                        secciones_cargadas[nombre_seccion] = json.load(f)
+            
+            # Ensamblar documento final
+            documento_final = ensamblar_proyecto_sentencia_resiliente(
+                secciones_cargadas, 
+                expediente,
+                secciones_faltantes=get_secciones_faltantes(pipeline_secciones, secciones_disponibles)
+            )
+            
+            # Guardar documento final
+            archivo_proyecto = carpeta_reporte / f"proyecto_sentencia_{expediente}_{timestamp}.md"
+            with open(archivo_proyecto, 'w', encoding='utf-8') as f:
+                f.write(documento_final)
+            
+            # Actualizar progreso final
+            progreso_existente['documento_final'] = {
+                'archivo': archivo_proyecto.name,
+                'secciones_incluidas': len(secciones_cargadas),
+                'secciones_faltantes': len(pipeline_secciones) - len(secciones_cargadas),
+                'timestamp': datetime.now().isoformat()
+            }
+            progreso_existente['estado'] = 'documento_generado' if len(secciones_cargadas) == len(pipeline_secciones) else 'documento_parcial'
+            guardar_checkpoint(archivo_checkpoint, progreso_existente)
+            
+            # 9. Resumen final
+            mostrar_resumen_resiliente(progreso_existente, carpeta_reporte, archivo_proyecto.name)
+        else:
+            print("❌ No se pudo generar ninguna sección. Revisa los errores en el checkpoint.")
+            
+    except Exception as e:
+        print(f"❌ Error fatal generando proyecto: {e}")
+
+def cargar_checkpoint(archivo_checkpoint: Path) -> dict:
+    """Carga el checkpoint existente o crea uno nuevo"""
+    if archivo_checkpoint.exists():
+        try:
+            with open(archivo_checkpoint, 'r', encoding='utf-8') as f:
+                progreso = json.load(f)
+                progreso['estado'] = 'resumiendo'
+                return progreso
+        except:
+            pass
+    
+    # Checkpoint inicial
+    return {
+        'estado': 'iniciando',
+        'timestamp_inicio': datetime.now().isoformat(),
+        'secciones_completadas': {},
+        'errores': [],
+        'tokens_totales': 0,
+        'ultima_actualizacion': datetime.now().isoformat()
+    }
+
+def guardar_checkpoint(archivo_checkpoint: Path, progreso: dict):
+    """Guarda el estado actual del progreso"""
+    with open(archivo_checkpoint, 'w', encoding='utf-8') as f:
+        json.dump(progreso, f, indent=2, ensure_ascii=False)
+
+def get_secciones_faltantes(pipeline_secciones: list, secciones_completadas: dict) -> list:
+    """Identifica qué secciones faltan"""
+    nombres_pipeline = [s['nombre'] for s in pipeline_secciones]
+    nombres_completadas = list(secciones_completadas.keys())
+    return [nombre for nombre in nombres_pipeline if nombre not in nombres_completadas]
+
+def ensamblar_proyecto_sentencia_resiliente(secciones: dict, expediente: str, secciones_faltantes: list = None) -> str:
+    """
+    Ensambla las secciones disponibles en un documento Markdown completo
+    MANEJA SECCIONES FALTANTES DE FORMA ELEGANTE
+    """
+    timestamp = datetime.now().strftime('%d de %B de %Y')
+    
+    documento = f"""# PROYECTO DE SENTENCIA
+## AMPARO DIRECTO EN REVISIÓN {expediente}
+
+---
+**Generado automáticamente el:** {timestamp}  
+**Sistema:** SCJN Analyzer v2.0  
+"""
+    
+    if secciones_faltantes:
+        documento += f"**⚠️ DOCUMENTO PARCIAL:** Faltan {len(secciones_faltantes)} secciones por generar\n"
+    
+    documento += "\n---\n\n"
+    
+    # Agregar Antecedentes si está disponible
+    if 'antecedentes' in secciones:
+        documento += "## ANTECEDENTES Y TRÁMITE\n\n"
+        antecedentes = secciones['antecedentes']
+        for item in antecedentes.get('contenido', []):
+            documento += f"### {item.get('subtitulo', '')}\n\n"
+            documento += f"{item.get('texto_narrativo', '')}\n\n"
+    elif 'antecedentes' in (secciones_faltantes or []):
+        documento += "## ANTECEDENTES Y TRÁMITE\n\n"
+        documento += "*⚠️ Esta sección no pudo ser generada automáticamente. Pendiente de elaboración.*\n\n"
+    
+    # Agregar Formalidades si está disponible
+    if 'formalidades' in secciones:
+        documento += "---\n\n## FORMALIDADES\n\n"
+        formalidades = secciones['formalidades']
+        
+        # Competencia
+        if 'seccion_competencia' in formalidades:
+            comp = formalidades['seccion_competencia']
+            documento += f"### {comp.get('titulo', 'I. COMPETENCIA')}\n\n"
+            documento += f"{comp.get('contenido', '')}\n\n"
+        
+        # Legitimación
+        if 'seccion_legitimacion' in formalidades:
+            leg = formalidades['seccion_legitimacion']
+            documento += f"### {leg.get('titulo', 'II. LEGITIMACIÓN')}\n\n"
+            documento += f"{leg.get('contenido', '')}\n\n"
+        
+        # Oportunidad
+        if 'seccion_oportunidad' in formalidades:
+            opo = formalidades['seccion_oportunidad']
+            documento += f"### {opo.get('titulo', 'III. OPORTUNIDAD')}\n\n"
+            documento += f"{opo.get('contenido', '')}\n\n"
+    elif 'formalidades' in (secciones_faltantes or []):
+        documento += "---\n\n## FORMALIDADES\n\n"
+        documento += "*⚠️ Esta sección no pudo ser generada automáticamente. Pendiente de elaboración.*\n\n"
+    
+    # Agregar Procedencia si está disponible
+    if 'procedencia' in secciones:
+        documento += "---\n\n"
+        procedencia = secciones['procedencia']
+        documento += f"## {procedencia.get('seccion', 'ESTUDIO DE PROCEDENCIA DEL RECURSO')}\n\n"
+        
+        for apartado in procedencia.get('apartados', []):
+            documento += f"### {apartado.get('titulo', '')}\n\n"
+            documento += f"{apartado.get('contenido', '')}\n\n"
+    elif 'procedencia' in (secciones_faltantes or []):
+        documento += "---\n\n## ESTUDIO DE PROCEDENCIA DEL RECURSO\n\n"
+        documento += "*⚠️ Esta sección no pudo ser generada automáticamente. Pendiente de elaboración.*\n\n"
+    
+    # Footer con información de generación
+    documento += """---
+
+*Este documento fue generado automáticamente por el Sistema de Análisis Jurisprudencial SCJN.*  
+*Revisión y validación jurídica requerida antes de su uso oficial.*
+"""
+    
+    if secciones_faltantes:
+        documento += f"\n**Secciones pendientes:** {', '.join(secciones_faltantes)}\n"
+        documento += "*Para completar las secciones faltantes, ejecuta nuevamente el comando de generación.*\n"
+    
+    return documento
+
+def mostrar_resumen_resiliente(progreso: dict, carpeta_reporte: Path, nombre_documento: str):
+    """Muestra resumen final del procesamiento resiliente"""
+    secciones_ok = len(progreso['secciones_completadas'])
+    errores = len(progreso['errores'])
+    
+    print("\n" + "="*60)
+    if progreso['estado'] == 'documento_generado':
+        print("🎉 PROYECTO DE SENTENCIA COMPLETADO")
+    else:
+        print("📋 DOCUMENTO PARCIAL GENERADO")
+    print("="*60)
+    print(f"📁 Carpeta: {carpeta_reporte}")
+    print(f"📄 Documento principal: {nombre_documento}")
+    print(f"✅ Secciones generadas exitosamente: {secciones_ok}")
+    if errores > 0:
+        print(f"❌ Secciones con errores: {errores}")
+        print("🔄 Para reintentarlas, ejecuta el mismo comando nuevamente")
+    print(f"🔤 Tokens totales utilizados: {progreso['tokens_totales']:,}")
+    
+    # Mostrar detalle de secciones
+    if progreso['secciones_completadas']:
+        print("\n📋 Secciones completadas:")
+        for nombre, info in progreso['secciones_completadas'].items():
+            print(f"  ✅ {nombre}: {info['archivo']} ({info['tokens']:,} tokens)")
+    
+    if progreso['errores']:
+        print("\n❌ Errores encontrados:")
+        for error in progreso['errores'][-3:]:  # Solo últimos 3 errores
+            print(f"  • {error['seccion']}: {error['error'][:100]}...")
+    
+    print("="*60)
+
 
 def main():
     """Función principal"""
     parser = argparse.ArgumentParser(description='Procesador de Expedientes SCJN')
     parser.add_argument('--expediente', type=str, required=True, 
                        help='Ruta a la carpeta del expediente')
-    parser.add_argument('--modo', choices=['extraccion', 'proyecto', 'completo'], 
+    parser.add_argument('--modo', choices=['extraccion', 'contexto', 'secciones', 'completo'], 
                        default='completo', help='Modo de procesamiento')
     parser.add_argument('--timeout', type=int, default=120,
                        help='Timeout por documento en segundos (default: 120)')
@@ -575,19 +888,21 @@ def main():
     analyzer = SCJNAnalyzer(config)
     
     try:
-        # 🆕 LÓGICA EXTENDIDA POR MODO
+        # LÓGICA EXTENDIDA POR MODO
         if args.modo in ['extraccion', 'completo']:
             print("🚀 Ejecutando extracción de documentos...")
             expediente_completo = analyzer.procesar_expediente_completo(carpeta_expediente, expediente)
             
             if expediente_completo:
                 analyzer.generar_reporte_ejecutivo(expediente)
-            
-            analyzer.mostrar_resumen_final(expediente_completo)
         
-        if args.modo in ['proyecto', 'completo']:
-            print("\n📋 Ejecutando generación de proyecto de sentencia...")
+        if args.modo in ['contexto', 'completo']:
+            print("\n📋 Ejecutando generación de contexto...")
             ejecutar_generacion_proyecto(carpeta_expediente, expediente)
+        
+        if args.modo in ['secciones', 'completo']:
+            print("\n📝 Ejecutando generación de secciones...")
+            generar_secciones_proyecto(carpeta_expediente, expediente)
             
     except KeyboardInterrupt:
         print("\n🛑 Proceso interrumpido por el usuario")
