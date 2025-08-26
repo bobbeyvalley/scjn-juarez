@@ -509,6 +509,27 @@ class SCJNAnalyzer:
         
         print("="*80)
 
+def capturar_datos_personal_jurisdiccional() -> tuple:
+    """
+    Captura datos del personal jurisdiccional para el formato Word
+    
+    Returns:
+        tuple: (nombre_ministro, nombre_secretario, nombre_secretario_aux, colaboradores)
+    """
+    print("\n👤 Información del personal jurisdiccional:")
+    nombre_ministro = input("Nombre del Ministro Ponente: ").strip()
+    nombre_secretario = input("Nombre del Secretario: ").strip()
+    nombre_secretario_aux = input("Nombre del Secretario Auxiliar (opcional): ").strip() or None
+    
+    colaboradores = []
+    while True:
+        colab = input("Colaborador adicional (Enter para continuar): ").strip()
+        if not colab:
+            break
+        colaboradores.append(colab)
+    
+    return nombre_ministro, nombre_secretario, nombre_secretario_aux, colaboradores
+
 def ejecutar_generacion_proyecto(carpeta_expediente: Path, expediente: str):
     """Ejecuta la generación del proyecto de sentencia"""
     try:
@@ -540,7 +561,9 @@ def ejecutar_generacion_proyecto(carpeta_expediente: Path, expediente: str):
     except Exception as e:
         print(f"❌ Error en generación de proyecto: {e}")
 
-def generar_secciones_proyecto(carpeta_expediente: Path, expediente: str):
+def generar_secciones_proyecto(carpeta_expediente: Path, expediente: str, 
+                              nombre_ministro: str, nombre_secretario: str, 
+                              nombre_secretario_aux: str = None, colaboradores: list = None):
     """
     Genera las 3 secciones principales del proyecto de sentencia
     CON SISTEMA DE CHECKPOINT Y RESUME AUTOMÁTICO
@@ -689,9 +712,15 @@ def generar_secciones_proyecto(carpeta_expediente: Path, expediente: str):
 
             # 🆕 GENERAR DOCUMENTO WORD AUTOMÁTICAMENTE
             print(f"📝 Generando documento Word profesional...")
+            print(f"🔍 DEBUG - Variables disponibles:")
+            print(f"  - nombre_ministro: {nombre_ministro}")
+            print(f"  - nombre_secretario: {nombre_secretario}")
+            print(f"🔍 DEBUG - Rutas:")
+            print(f"  - carpeta_reporte: {carpeta_reporte}")
+            print(f"  - archivo_markdown: {archivo_proyecto}")
             try:
                 archivo_word = convertir_markdown_a_word(
-                    archivo_markdown=archivo_proyecto_md,
+                    archivo_markdown=archivo_proyecto,
                     expediente=expediente,
                     carpeta_salida=carpeta_reporte,
                     contexto_caso=contexto,
@@ -701,6 +730,8 @@ def generar_secciones_proyecto(carpeta_expediente: Path, expediente: str):
                     colaboradores=colaboradores
                 )
                 print(f"  ✅ Documento Word generado: {archivo_word.name}")
+                print(f"  📂 Ubicación completa: {archivo_word}")
+                print(f"  📂 Existe el archivo? {archivo_word.exists()}")
                 
                 # Actualizar progreso con información del Word
                 progreso_existente['documento_word'] = {
@@ -914,7 +945,13 @@ def main():
     analyzer = SCJNAnalyzer(config)
     
     try:
-        # LÓGICA EXTENDIDA POR MODO
+        # Variables para personal jurisdiccional (inicializar como None)
+        nombre_ministro = None
+        nombre_secretario = None  
+        nombre_secretario_aux = None
+        colaboradores = []
+        
+        # EJECUTAR SEGÚN MODO SELECCIONADO
         if args.modo in ['extraccion', 'completo']:
             print("🚀 Ejecutando extracción de documentos...")
             expediente_completo = analyzer.procesar_expediente_completo(carpeta_expediente, expediente)
@@ -926,22 +963,13 @@ def main():
             print("\n📋 Ejecutando generación de contexto...")
             ejecutar_generacion_proyecto(carpeta_expediente, expediente)
         
+        # CAPTURAR DATOS PERSONALES PARA MODOS QUE GENERAN WORD
         if args.modo in ['secciones', 'completo']:
-            print("\n📝 Ejecutando generación de secciones...")
-            generar_secciones_proyecto(carpeta_expediente, expediente)
+            nombre_ministro, nombre_secretario, nombre_secretario_aux, colaboradores = capturar_datos_personal_jurisdiccional()
             
-        # Capturar variables para formato SCJN
-        print("\n👤 Información del personal jurisdiccional:")
-        nombre_ministro = input("Nombre del Ministro Ponente: ").strip()
-        nombre_secretario = input("Nombre del Secretario: ").strip()
-        nombre_secretario_aux = input("Nombre del Secretario Auxiliar (opcional): ").strip() or None
-        colaboradores = []
-        while True:
-            colab = input("Colaborador adicional (Enter para continuar): ").strip()
-            if not colab:
-                break
-            colaboradores.append(colab)
-
+            print("\n📝 Ejecutando generación de secciones...")
+            generar_secciones_proyecto(carpeta_expediente, expediente, nombre_ministro, nombre_secretario, nombre_secretario_aux, colaboradores)
+        
     except KeyboardInterrupt:
         print("\n🛑 Proceso interrumpido por el usuario")
     except Exception as e:

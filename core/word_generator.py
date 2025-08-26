@@ -37,22 +37,46 @@ class SCJNWordGenerator:
         Returns:
             Path: Ruta del archivo Word generado
         """
+        print("🔍 DEBUG - Iniciando crear_documento_desde_markdown")
+            
         self.doc = Document()
-        self._configurar_estilos_profesionales()
-        self._configurar_pagina()
+        print("🔍 DEBUG - Documento Word creado")
         
+        self._configurar_estilos_profesionales()
+        print("🔍 DEBUG - Estilos configurados")
+        
+        self._configurar_pagina()
+        print("🔍 DEBUG - Página configurada")
+    
         # Agregar header institucional
-        self._agregar_header_scjn(expediente)
+        self._agregar_header_scjn(
+            expediente=expediente,
+            nombre_ministro=nombre_ministro,
+            nombre_secretario=nombre_secretario,
+            contexto_caso=contexto_caso,
+            nombre_secretario_aux=nombre_secretario_aux,
+            colaboradores=colaboradores
+        )
+
+        print("🔍 DEBUG - Header completado")
         
         # Procesar contenido Markdown
+        print("🔍 DEBUG - Iniciando procesamiento de Markdown...")
         self._procesar_markdown(contenido_markdown)
-        
+        print("🔍 DEBUG - Markdown procesado") 
+
         # Agregar footer
+        print("🔍 DEBUG - Agregando footer...")
         self._agregar_footer()
-        
+        print("🔍 DEBUG - Footer agregado")     
+    
         # Guardar documento
+        print(f"🔍 DEBUG - Guardando documento en: {archivo_salida}")
         self.doc.save(archivo_salida)
+        print(f"🔍 DEBUG - Archivo guardado exitosamente: {archivo_salida.exists()}")
         return archivo_salida
+  
+      
 
     def _configurar_estilos_profesionales(self):
         """Configura estilos profesionales para documentos SCJN"""
@@ -139,8 +163,9 @@ class SCJNWordGenerator:
             section.right_margin = Inches(1.0)
 
     def _agregar_header_scjn(self, expediente: str, nombre_ministro: str, 
-                            nombre_secretario: str, nombre_secretario_aux: str = None, 
-                            colaboradores: list = None):
+                        nombre_secretario: str, contexto_caso: dict,
+                        nombre_secretario_aux: str = None, 
+                        colaboradores: list = None):
         """Agrega header institucional estilo SCJN con placeholders"""
         
         # Header con datos del caso
@@ -174,11 +199,21 @@ class SCJNWordGenerator:
         indice_placeholder.add_run('[INSERTAR TABLA DE ÍNDICE TEMÁTICO AL FINALIZAR]')
 
     def _procesar_markdown(self, contenido: str):
-        """Procesa el contenido Markdown línea por línea"""
+        """Procesa el contenido Markdown línea por línea - Versión Segura"""
+        print(f"🔍 DEBUG - Procesando {len(contenido)} caracteres de Markdown")
         lineas = contenido.split('\n')
-        i = 0
+        print(f"🔍 DEBUG - Dividido en {len(lineas)} líneas")
         
-        while i < len(lineas):
+        i = 0
+        max_iteraciones = len(lineas) * 2  # Límite de seguridad
+        iteraciones = 0
+        
+        while i < len(lineas) and iteraciones < max_iteraciones:
+            iteraciones += 1
+            
+            if iteraciones % 100 == 0:  # Debug cada 100 iteraciones
+                print(f"🔍 DEBUG - Iteración {iteraciones}, línea {i}/{len(lineas)}")
+            
             linea = lineas[i].strip()
             
             if not linea:
@@ -188,8 +223,12 @@ class SCJNWordGenerator:
                 continue
             
             # Headers
-            if linea.startswith('# '):
-                # H1 - Título principal (ya lo manejamos en el header)
+            if linea.startswith('### '):
+                # H3 - Subsecciones
+                titulo = linea[4:].strip()
+                p = self.doc.add_paragraph()
+                p.style = 'SubtituloH3'
+                p.add_run(titulo)
                 i += 1
                 continue
             elif linea.startswith('## '):
@@ -200,12 +239,8 @@ class SCJNWordGenerator:
                 p.add_run(titulo)
                 i += 1
                 continue
-            elif linea.startswith('### '):
-                # H3 - Subsecciones
-                titulo = linea[4:].strip()
-                p = self.doc.add_paragraph()
-                p.style = 'SubtituloH3'
-                p.add_run(titulo)
+            elif linea.startswith('# '):
+                # H1 - Título principal (saltar)
                 i += 1
                 continue
             
@@ -229,37 +264,23 @@ class SCJNWordGenerator:
             elif linea.startswith('*⚠️') or linea.startswith('*Nota:'):
                 p = self.doc.add_paragraph()
                 p.style = 'CitaTextual'
-                p.add_run(linea[1:] if linea.startswith('*') else linea)
+                texto = linea[1:] if linea.startswith('*') else linea
+                p.add_run(texto)
                 i += 1
                 continue
             
             else:
-                # Texto normal - puede ser párrafo multi-línea
-                parrafo_completo = []
-                
-                # Recolectar líneas hasta encontrar línea vacía o nuevo elemento
-                while i < len(lineas):
-                    linea_actual = lineas[i].strip()
-                    
-                    if not linea_actual:
-                        break
-                    if linea_actual.startswith('#') or linea_actual.startswith('---'):
-                        break
-                    if linea_actual.startswith('*') and linea_actual.endswith('*'):
-                        break
-                        
-                    parrafo_completo.append(linea_actual)
-                    i += 1
-                
-                if parrafo_completo:
-                    texto_parrafo = ' '.join(parrafo_completo)
-                    p = self.doc.add_paragraph()
-                    p.style = 'TextoNormal'
-                    
-                    # Procesar texto con formato inline (negritas, cursivas)
-                    self._agregar_texto_con_formato(p, texto_parrafo)
-                
+                # Texto normal - VERSIÓN SEGURA
+                p = self.doc.add_paragraph()
+                p.style = 'TextoNormal'
+                self._agregar_texto_con_formato(p, linea)
+                i += 1
                 continue
+        
+        if iteraciones >= max_iteraciones:
+            print(f"⚠️ ADVERTENCIA: Procesamiento limitado por seguridad en {max_iteraciones} iteraciones")
+        
+        print(f"🔍 DEBUG - Markdown procesado en {iteraciones} iteraciones")
 
     def _agregar_texto_con_formato(self, paragraph, texto: str):
         """Agrega texto con formato inline (negritas, cursivas) preservado"""
@@ -300,8 +321,9 @@ Revisión y validación jurídica requerida antes de su uso oficial.
         footer_p.add_run(footer_text)
 
 def convertir_markdown_a_word(archivo_markdown: Path, expediente: str, 
-                             carpeta_salida: Path, nombre_ministro: str,
-                             nombre_secretario: str, nombre_secretario_aux: str = None,
+                             carpeta_salida: Path, contexto_caso: dict,
+                             nombre_ministro: str, nombre_secretario: str, 
+                             nombre_secretario_aux: str = None,
                              colaboradores: list = None) -> Path:
     """
     Función utilitaria para convertir un archivo Markdown a Word
@@ -326,12 +348,25 @@ def convertir_markdown_a_word(archivo_markdown: Path, expediente: str,
     nombre_word = f"proyecto_sentencia_{expediente}_{timestamp}.docx"
     archivo_word = carpeta_salida / nombre_word
     
+    print(f"🔍 DEBUG Word - Datos recibidos:")
+    print(f"  - carpeta_salida: {carpeta_salida}")
+    print(f"  - nombre_word: {nombre_word}")
+    print(f"  - archivo_word completo: {archivo_word}")
+    print(f"  - carpeta_salida existe? {carpeta_salida.exists()}")
+
     # Generar documento Word
     generator = SCJNWordGenerator()
+    print(f"🔍 DEBUG - Guardando Word en: {archivo_word}")
     generator.crear_documento_desde_markdown(
         contenido_markdown=contenido_markdown,
         expediente=expediente,
-        archivo_salida=archivo_word
+        archivo_salida=archivo_word,
+        contexto_caso=contexto_caso,
+        nombre_ministro=nombre_ministro,
+        nombre_secretario=nombre_secretario,
+        nombre_secretario_aux=nombre_secretario_aux,
+        colaboradores=colaboradores
     )
     
+    print(f"🔍 DEBUG - Word guardado exitosamente: {archivo_word.exists()}")
     return archivo_word
