@@ -329,7 +329,7 @@ class GeminiClient:
     
     Donde:
     - [tipo de documento] = etapa_procesal_resuelta en español (ej. "demanda de amparo", "sentencia recurrida", "recurso de revisión")
-    - [nombre_archivo] = campo "documento" exacto
+    - [descripción_documento] = usar el tipo_documento + expediente cuando sea posible, o una descripción más legible que el nombre técnico del archivo
     - página/páginas = extraído de "paginas_pdf" o "puntos_analisis[].pagina"
 
     4. Estructura tu respuesta en un formato JSON que contenga una lista de objetos, donde cada objeto represente un subtítulo y el texto narrativo correspondiente a esa etapa del proceso.
@@ -361,11 +361,15 @@ class GeminiClient:
     2. **Para LEGITIMACIÓN:** Redacta un párrafo que establezca que la parte recurrente está legitimada para interponer el recurso, indicando su carácter en el juicio de amparo.
     3. **Para OPORTUNIDAD:** Redacta el párrafo que narra el cómputo del plazo. Indica la fecha de notificación de la sentencia recurrida, cuándo surtió efectos, el periodo del plazo de diez días, los días inhábiles que se descontaron y la fecha de presentación del recurso.
 
-    # REFERENCIAS OBLIGATORIAS
     **DEBES incluir referencias a los documentos originales en cada sección usando este formato:**
-    - "Según se advierte del acuerdo de admisión ([nombre_archivo], página X)..."
-    - "Conforme consta en el recurso de revisión ([nombre_archivo], páginas X-Y)..."
-    - "Como se desprende de la notificación ([nombre_archivo])..."
+    - "Según se advierte del acuerdo de admisión (expediente [expediente], página X)..."
+    - "Conforme consta en el recurso de revisión ([tipo_documento], páginas X-Y)..."
+    - "Como se desprende de la notificación ([descripción_legible])..."
+
+    **INSTRUCCIONES PARA REFERENCIAS:**
+    - Usa el número de expediente cuando esté disponible en lugar del nombre técnico del archivo
+    - Para documentos con nombres crípticos (ej: archivos .p7m), usa una descripción basada en el tipo_documento + expediente
+    - Ejemplo: en lugar de "(2420002000000000003485451.p7m, página 1)" usa "(recurso de revisión A.D.R. 4155/2024, página 1)"
 
     **EXTRAE las fechas, plazos y datos específicos directamente de los documentos del contexto proporcionado.**
 
@@ -377,8 +381,9 @@ class GeminiClient:
     "seccion_oportunidad": { "titulo": "III. OPORTUNIDAD", "contenido": "..." }
     }
 
-    **EJEMPLO CON REFERENCIAS:**
-    "El recurso de revisión fue interpuesto de forma oportuna. Según se advierte del oficio de notificación (Oficio de Notificación de Sentencia de Amparo Directo, página 1), la sentencia recurrida se notificó por oficio el nueve de agosto de dos mil veintitrés..."
+    **EJEMPLOS CON REFERENCIAS:**
+    -"El recurso de revisión fue interpuesto de forma oportuna. Según se advierte del oficio de notificación ((expediente A.D.C. 388/2023, página 5)), la sentencia recurrida se notificó por oficio el nueve de agosto de dos mil veintitrés..."
+    -"Según consta en el recurso de revisión (A.D.R. 4155/2024, páginas 1-15)..."
     """,
 
             'procedencia': """# TAREA
@@ -397,15 +402,20 @@ class GeminiClient:
     # REFERENCIAS OBLIGATORIAS EN CADA APARTADO
     **DEBES incluir referencias específicas a los documentos originales:**
 
-    - **Para Demanda de amparo:** "Conforme se desprende de la demanda de amparo ([nombre_archivo], páginas X-Y)..."
-    - **Para Sentencia del Tribunal:** "Según consta en la sentencia recurrida ([nombre_archivo], página X)..."
-    - **Para Agravios de Revisión:** "Como se advierte del recurso de revisión ([nombre_archivo], páginas X-Y)..."
-    - **Para Procedencia:** "Según se estableció en el acuerdo de admisión ([nombre_archivo], página X)..."
+    - **Para Demanda de amparo:** "Conforme se desprende de la demanda de amparo (expediente [expediente], páginas X-Y)..."
+    - **Para Sentencia del Tribunal:** "Según consta en la sentencia recurrida ([tipo_documento_legible], página X)..."
+    - **Para Agravios de Revisión:** "Como se advierte del recurso de revisión ([descripción_documento], páginas X-Y)..."
+    - **Para Procedencia:** "Según se estableció en el acuerdo de admisión ([referencia_legible], página X)..."
+
+    **INSTRUCCIONES PARA REFERENCIAS LEGIBLES:**
+    - Prioriza usar expedientes y tipos de documento legibles sobre nombres técnicos de archivo
+    - Para archivos con extensiones crípticas (.p7m, códigos largos), usa el campo tipo_documento + expediente
+    - Ejemplo: "recurso de revisión A.D.R. 4155/2024" en lugar de "24200020000000000034854251.p7m"
 
     **EXTRAE la información específica de páginas de los campos:**
     - `puntos_analisis[].pagina` para referencias específicas
     - `paginas_pdf` para rangos de páginas del documento
-    - `documento` para el nombre exacto del archivo
+    - `expedientes_principales` del contexto para crear referencias legibles
 
     # FORMATO DE SALIDA
     Tu respuesta debe ser únicamente un objeto JSON válido con la siguiente estructura:

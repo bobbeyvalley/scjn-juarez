@@ -315,6 +315,7 @@ class SCJNWordGenerator:
         run2.font.name = 'Arial'
         run2.font.size = Pt(13) 
         run2.font.bold = True
+        run2.font.color.rgb = RGBColor(255, 0, 0)  # Rojo
         
         # Espacio
         self.doc.add_paragraph()
