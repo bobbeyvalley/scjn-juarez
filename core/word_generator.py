@@ -37,18 +37,12 @@ class SCJNWordGenerator:
         Returns:
             Path: Ruta del archivo Word generado
         """
-        print("🔍 DEBUG - Iniciando crear_documento_desde_markdown")
             
         self.doc = Document()
-        print("🔍 DEBUG - Documento Word creado")
-        
         self._configurar_estilos_profesionales()
-        print("🔍 DEBUG - Estilos configurados")
-        
-        self._configurar_pagina()
-        print("🔍 DEBUG - Página configurada")
-    
-        # Agregar header institucional
+        #self._crear_estructura_dos_secciones()
+
+        # Primera sección - página de presentación  
         self._agregar_header_scjn(
             expediente=expediente,
             nombre_ministro=nombre_ministro,
@@ -58,7 +52,14 @@ class SCJNWordGenerator:
             colaboradores=colaboradores
         )
 
-        print("🔍 DEBUG - Header completado")
+        # Segunda sección - repetir header + contenido
+        self._agregar_header_segunda_seccion(
+            expediente=expediente,
+            nombre_ministro=nombre_ministro,
+            nombre_secretario=nombre_secretario,
+            contexto_caso=contexto_caso,
+            nombre_secretario_aux=nombre_secretario_aux
+        )
         
         # Procesar contenido Markdown
         print("🔍 DEBUG - Iniciando procesamiento de Markdown...")
@@ -66,17 +67,16 @@ class SCJNWordGenerator:
         print("🔍 DEBUG - Markdown procesado") 
 
         # Agregar footer
-        print("🔍 DEBUG - Agregando footer...")
+        #print("🔍 DEBUG - Agregando footer...")
         self._agregar_footer()
-        print("🔍 DEBUG - Footer agregado")     
+        #print("🔍 DEBUG - Footer agregado")     
     
         # Guardar documento
         print(f"🔍 DEBUG - Guardando documento en: {archivo_salida}")
         self.doc.save(archivo_salida)
         print(f"🔍 DEBUG - Archivo guardado exitosamente: {archivo_salida.exists()}")
         return archivo_salida
-  
-      
+        
 
     def _configurar_estilos_profesionales(self):
         """Configura estilos profesionales para documentos SCJN"""
@@ -91,11 +91,11 @@ class SCJNWordGenerator:
         except:
             titulo_principal = styles['TituloPrincipal']
         
-        titulo_principal.font.name = 'Times New Roman'
-        titulo_principal.font.size = Pt(16)
+        titulo_principal.font.name = 'Arial'
+        titulo_principal.font.size = Pt(13)
         titulo_principal.font.bold = True
-        titulo_principal.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        titulo_principal.paragraph_format.space_after = Pt(12)
+        titulo_principal.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        titulo_principal.paragraph_format.space_after = Pt(13)
         
         # Estilo para subtítulos nivel 2
         try:
@@ -103,10 +103,10 @@ class SCJNWordGenerator:
         except:
             subtitulo_h2 = styles['SubtituloH2']
             
-        subtitulo_h2.font.name = 'Times New Roman'
-        subtitulo_h2.font.size = Pt(14)
+        subtitulo_h2.font.name = 'Arial'
+        subtitulo_h2.font.size = Pt(13)
         subtitulo_h2.font.bold = True
-        subtitulo_h2.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        subtitulo_h2.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
         subtitulo_h2.paragraph_format.space_before = Pt(12)
         subtitulo_h2.paragraph_format.space_after = Pt(6)
         
@@ -116,8 +116,8 @@ class SCJNWordGenerator:
         except:
             subtitulo_h3 = styles['SubtituloH3']
             
-        subtitulo_h3.font.name = 'Times New Roman'
-        subtitulo_h3.font.size = Pt(12)
+        subtitulo_h3.font.name = 'Arial'
+        subtitulo_h3.font.size = Pt(13)
         subtitulo_h3.font.bold = True
         subtitulo_h3.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
         subtitulo_h3.paragraph_format.space_before = Pt(6)
@@ -129,8 +129,8 @@ class SCJNWordGenerator:
         except:
             texto_normal = styles['TextoNormal']
             
-        texto_normal.font.name = 'Times New Roman'
-        texto_normal.font.size = Pt(11)
+        texto_normal.font.name = 'Arial'
+        texto_normal.font.size = Pt(13)
         texto_normal.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
         texto_normal.paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
         texto_normal.paragraph_format.space_after = Pt(6)
@@ -142,8 +142,8 @@ class SCJNWordGenerator:
         except:
             cita_textual = styles['CitaTextual']
             
-        cita_textual.font.name = 'Times New Roman'
-        cita_textual.font.size = Pt(10)
+        cita_textual.font.name = 'Arial'
+        cita_textual.font.size = Pt(13)
         cita_textual.font.italic = True
         cita_textual.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
         cita_textual.paragraph_format.left_indent = Inches(0.5)
@@ -162,41 +162,192 @@ class SCJNWordGenerator:
             section.left_margin = Inches(1.5)
             section.right_margin = Inches(1.0)
 
+    def _crear_estructura_dos_secciones(self):
+        """Configura documento con dos secciones separadas"""
+        # Sección 1 - sin header/footer (página de presentación)
+        section1 = self.doc.sections[0]
+        section1.top_margin = Inches(1.0)
+        section1.bottom_margin = Inches(1.0)
+        section1.left_margin = Inches(1.5)
+        section1.right_margin = Inches(1.0)
+        
+        # Agregar section break después de la primera sección
+        self.doc.add_section()
+        
+        # Sección 2 - con header/footer
+        section2 = self.doc.sections[1]
+        section2.top_margin = Inches(1.0)
+        section2.bottom_margin = Inches(1.0) 
+        section2.left_margin = Inches(1.5)
+        section2.right_margin = Inches(1.0)
+        
+        # Configurar header para sección 2
+        header = section2.header
+        header_para = header.paragraphs[0]
+        header_para.text = "[RECURSO - EXPEDIENTE]"
+        header_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = header_para.runs[0]
+        run.font.name = 'Arial'
+        run.font.size = Pt(13)
+        run.font.bold = True
+        
+        # Configurar footer para sección 2 (numeración)
+        footer = section2.footer
+        footer_para = footer.paragraphs[0]
+        footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        # Agregar número de página
+        from docx.oxml import parse_xml
+        from docx.oxml.ns import nsdecls
+        
+        fldChar1 = parse_xml(r'<w:fldChar w:fldCharType="begin" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>')
+        instrText = parse_xml(r'<w:instrText xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"> PAGE </w:instrText>')
+        fldChar2 = parse_xml(r'<w:fldChar w:fldCharType="end" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>')
+        
+        footer_para._p.append(fldChar1)
+        footer_para._p.append(instrText) 
+        footer_para._p.append(fldChar2)
+        
+        # Configurar numeración para que empiece en página 2
+        section2.start_type = 2  # Página continua
+        section2.page_start = 2
+
     def _agregar_header_scjn(self, expediente: str, nombre_ministro: str, 
                         nombre_secretario: str, contexto_caso: dict,
                         nombre_secretario_aux: str = None, 
                         colaboradores: list = None):
-        """Agrega header institucional estilo SCJN con placeholders"""
+        """Agrega header de primera página con formato especial"""
         
-        # Header con datos del caso
-        header = self.doc.add_paragraph()
-        header.style = 'TituloPrincipal'
-        header.paragraph_format.left_indent = Inches(2.0)
-        expediente_principal = contexto_caso.get('metadata_caso', {}).get('expediente_principal', f'ASUNTO {expediente}')
-        header.add_run(f'{expediente_principal}\n\n')
-        header.add_run('[INSERTAR DATOS DEL QUEJOSO]\n\n')
-        header.add_run('[INSERTAR DATOS DEL RECURRENTE]')
+        # SECCIÓN 1 - PÁGINA DE PRESENTACIÓN
+        # Tipo de caso y datos (con margen especial)
+        caso_para = self.doc.add_paragraph()
+        caso_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        caso_para.paragraph_format.left_indent = Inches(3.15)  # ~8cm
+        
+        expediente_principal = contexto_caso.get('metadata_caso', {}).get('expediente_principal', f'AMPARO DIRECTO EN REVISIÓN {expediente}')
+        
+        # Línea del caso
+        run1 = caso_para.add_run(expediente_principal)
+        run1.font.name = 'Arial'
+        run1.font.size = Pt(13)
+        run1.font.bold = True
+        
+        caso_para.add_run('\n')
+        
+        # Línea del quejoso
+        run2 = caso_para.add_run('QUEJOSA Y RECURRENTE: ')
+        run2.font.name = 'Arial'
+        run2.font.size = Pt(13)
+        run2.font.bold = True
+        
+        run3 = caso_para.add_run('[INSERTAR DATOS DEL QUEJOSO]')
+        run3.font.name = 'Arial'
+        run3.font.size = Pt(13)
+        run3.font.bold = True
+        run3.font.color.rgb = RGBColor(255, 0, 0)  # Rojo
+        
+        # Espacio
+        self.doc.add_paragraph()
         
         # Personal jurisdiccional
         personal = self.doc.add_paragraph()
-        personal.style = 'TextoNormal'
-        personal.add_run(f'PONENTE: MINISTRO {nombre_ministro.upper()}\n\n')
-        personal.add_run(f'SECRETARIO: {nombre_secretario.upper()}\n\n')
+        personal.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        
+        personal.add_run(f'PONENTE: MINISTRO {nombre_ministro.upper()}\n')
+        personal.add_run(f'SECRETARIO: {nombre_secretario.upper()}')
         
         if nombre_secretario_aux:
-            personal.add_run(f'SECRETARIO AUXILIAR: {nombre_secretario_aux.upper()}\n\n')
+            personal.add_run(f'\nSECRETARIO AUXILIAR: {nombre_secretario_aux.upper()}')
         
-        if colaboradores:
-            for colab in colaboradores:
-                personal.add_run(f'COLABORÓ: {colab.upper()}\n\n')
+        # Aplicar formato al párrafo de personal
+        for run in personal.runs:
+            run.font.name = 'Arial'
+            run.font.size = Pt(13)
+            run.font.bold = True
         
-        # Placeholder para índice temático
-        indice = self.doc.add_paragraph()
-        indice.style = 'SubtituloH2'
-        indice.add_run('ÍNDICE TEMÁTICO\n')
-        indice_placeholder = self.doc.add_paragraph()
-        indice_placeholder.style = 'TextoNormal'
-        indice_placeholder.add_run('[INSERTAR TABLA DE ÍNDICE TEMÁTICO AL FINALIZAR]')
+        # Espacio antes de la tabla
+        self.doc.add_paragraph()
+        
+        # Tabla del índice temático (4x2)
+        tabla_indice = self.doc.add_table(rows=2, cols=4)
+        tabla_indice.style = 'Table Grid'
+        
+        # Headers de la tabla
+        headers = tabla_indice.rows[0].cells
+        headers[0].text = ""  # Vacía
+        headers[1].text = "Apartado"
+        headers[2].text = "Criterio y decisión"
+        headers[3].text = "Págs."
+        
+        # Formatear headers
+        for cell in headers:
+            for para in cell.paragraphs:
+                for run in para.runs:
+                    run.font.name = 'Arial'
+                    run.font.size = Pt(13)
+                    run.font.bold = True
+                para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    def _agregar_header_segunda_seccion(self, expediente: str, nombre_ministro: str, 
+                               nombre_secretario: str, contexto_caso: dict,
+                               nombre_secretario_aux: str = None):
+        """Agrega header repetido en segunda sección"""
+        
+        # Cambiar a segunda sección
+        self.doc.add_page_break()
+        
+        # Repetir información del caso (CON MARGEN IGUAL QUE PRIMERA PÁGINA)
+        caso_para2 = self.doc.add_paragraph()
+        caso_para2.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        caso_para2.paragraph_format.left_indent = Inches(3.15)  # MISMO MARGEN
+        caso_para2.paragraph_format.space_after = Pt(12)
+        
+        expediente_principal = contexto_caso.get('metadata_caso', {}).get('expediente_principal', f'AMPARO DIRECTO EN REVISIÓN {expediente}')
+        
+        run1 = caso_para2.add_run(expediente_principal)
+        run1.font.name = 'Arial'
+        run1.font.size = Pt(13)
+        run1.font.bold = True
+        
+        caso_para2.add_run('\n')
+        
+        run2 = caso_para2.add_run('QUEJOSA Y RECURRENTE: [INSERTAR DATOS DEL QUEJOSO]')
+        run2.font.name = 'Arial'
+        run2.font.size = Pt(13) 
+        run2.font.bold = True
+        
+        # Espacio
+        self.doc.add_paragraph()
+        
+        # Repetir personal (FORMATO IGUAL QUE PRIMERA PÁGINA)
+        personal2 = self.doc.add_paragraph()
+        personal2.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        personal2.paragraph_format.space_after = Pt(12)
+        
+        personal2.add_run(f'PONENTE: MINISTRO {nombre_ministro.upper()}\n')
+        personal2.add_run(f'SECRETARIO: {nombre_secretario.upper()}')
+        
+        if nombre_secretario_aux:
+            personal2.add_run(f'\nSECRETARIO AUXILIAR: {nombre_secretario_aux.upper()}')
+        
+        for run in personal2.runs:
+            run.font.name = 'Arial'
+            run.font.size = Pt(13)
+            run.font.bold = True
+        
+        # Espacio
+        self.doc.add_paragraph()
+        
+        # Placeholder SENTENCIA
+        sentencia_para = self.doc.add_paragraph()
+        sentencia_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        sentencia_para.paragraph_format.space_before = Pt(24)
+        sentencia_para.paragraph_format.space_after = Pt(24)
+        
+        run_sentencia = sentencia_para.add_run('[SENTENCIA]')
+        run_sentencia.font.name = 'Arial'
+        run_sentencia.font.size = Pt(13)
+        run_sentencia.font.bold = True
 
     def _procesar_markdown(self, contenido: str):
         """Procesa el contenido Markdown línea por línea - Versión Segura"""
@@ -313,7 +464,7 @@ class SCJNWordGenerator:
         
         fecha_generacion = datetime.now().strftime('%d de %B de %Y')
         footer_text = f"""
-Este documento fue generado automáticamente por el Sistema de Análisis Jurisprudencial SCJN.
+Este documento fue generado automáticamente por el Sistema de Análisis Optimia - SCJN.
 Fecha de generación: {fecha_generacion}
 Revisión y validación jurídica requerida antes de su uso oficial.
         """.strip()
